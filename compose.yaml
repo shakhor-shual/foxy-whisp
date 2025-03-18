@@ -1,0 +1,29 @@
+services:
+  whisper-server-gpu:
+    image: foxy-whisp:latest
+    container_name: foxy-whisp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+    runtime: nvidia
+    ports:
+      - "43007:43007"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      # - WHISPER_BUFFER_TRIMMING=sentence
+      - WHISPER_MODEL=large-v3
+      - WHISPER_LANG=${WHISPER_LANG:-ru}
+      - WHISPER_TASK=${WHISPER_TASK:-transcribe}
+      - WHISPER_VAC=True
+      # - WHISPER_VAD=True
+      # - WHISPER_COMP_UNAWARE=False
+      # - WHISPER_MIN_CHUNK_SIZE=1.0
+    stdin_open: true
+    tty: true
+volumes:
+  hugging_face_cache:

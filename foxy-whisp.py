@@ -933,7 +933,293 @@ class AsyncServerProcessor:
             return await self.send_result(final_text, "")
         return await self.send_result((None, None, ''), "")
     
-    
+    # class AsyncServerProcessor:
+    # def __init__(self, connection: AsyncConnection, online_asr_proc, min_chunk: float, language: str = "en"):
+    #     self.connection = connection
+    #     self.asr_proc = online_asr_proc
+    #     self.min_chunk = min_chunk
+    #     self.language = language
+    #     self.audio_buffer = np.array([], dtype=np.float32)
+    #     self.last_end = None
+    #     self.is_first = True
+    #     self.void_counter = 0
+    #     self.max_void = 5
+
+    # def has_punctuation(self, text: str) -> bool:
+    #     if self.language in ["en", "ru"]:
+    #         return any(punc in text for punc in [".", "!", "?"])
+    #     return "." in text
+
+    # def trim_at_sentence_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+    #     if buffer is None:
+    #         logger.warning("Buffer is None, returning empty buffer")
+    #         return np.array([], dtype=np.float32)
+
+    #     if self.has_punctuation(text):
+    #         last_punc_end_pos = max(text.rfind("."), text.rfind("!"), text.rfind("?"))
+    #         if last_punc_end_pos != -1:
+    #             logger.debug(f"Trimming buffer at last punctuation position: {last_punc_end_pos}")
+    #             return buffer[:last_punc_end_pos + 1]
+
+    #     return buffer
+
+    # def trim_at_clause_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+    #     if buffer is None:
+    #         logger.warning("Buffer is None, returning empty buffer")
+    #         return np.array([], dtype=np.float32)
+
+    #     last_punc_mid_pos = max(text.rfind(","), text.rfind(":"))
+    #     if last_punc_mid_pos != -1:
+    #         logger.debug(f"Trimming buffer at last punctuation position: {last_punc_mid_pos}")
+    #         return buffer[:last_punc_mid_pos + 1]
+
+    #     return buffer
+
+    # def format_output_transcript(self, o, t):
+    #     if o[0] is not None:
+    #         beg, end = o[0] * 1000, o[1] * 1000
+    #         if self.last_end is not None:
+    #             beg = max(beg, self.last_end)
+
+    #         self.last_end = end
+    #         text_commit = o[2]
+    #         return f"[ {beg:.0f}, {end:.0f}, {end - beg:.0f} ] {text_commit}"
+
+    #     logger.debug("No text in this segment")
+    #     return None
+
+    # async def send_result(self, o, t):
+    #     msg = self.format_output_transcript(o, t)
+    #     try:
+    #         if msg is not None:
+    #             await self.connection.send(msg)
+    #         if t is not None:
+    #             # Убираем фигурные скобки, если они не нужны
+    #             t_cleaned = t.replace("{", "").replace("}", "")
+    #             await self.connection.send(t_cleaned)
+    #         return True
+    #     except BrokenPipeError:
+    #         logger.info("Broken pipe -- connection closed?")
+    #         return False
+
+    # async def receive_audio_chunk(self) -> Optional[np.ndarray]:
+    #     out = []
+    #     min_limit = self.min_chunk * SAMPLING_RATE
+
+    #     while sum(len(x) for x in out) < min_limit:
+    #         raw_bytes = await self.connection.receive_audio()
+    #         if not raw_bytes:
+    #             self.void_counter += 1
+    #             break
+
+    #         self.void_counter = 0
+    #         with soundfile.SoundFile(
+    #             io.BytesIO(raw_bytes),
+    #             channels=1,
+    #             endian="LITTLE",
+    #             samplerate=SAMPLING_RATE,
+    #             subtype="PCM_16",
+    #             format="RAW",
+    #         ) as sf:
+    #             audio, _ = librosa.load(sf, sr=SAMPLING_RATE, dtype=np.float32)
+    #             out.append(audio)
+
+    #     if not out:
+    #         return None
+
+    #     conc = np.concatenate(out)
+    #     if self.is_first and len(conc) < min_limit:
+    #         return None
+
+    #     self.is_first = False
+    #     return conc
+
+    # async def process(self):
+    #     self.asr_proc.init()
+    #     send_error = False
+    #     outcome = None
+
+    #     while not send_error and self.void_counter < self.max_void:
+    #         audio_chunk = await self.receive_audio_chunk()
+    #         if audio_chunk is None:
+    #             continue
+
+    #         logger.info(f"Received audio chunk of length: {len(audio_chunk)}")
+    #         self.asr_proc.insert_audio_chunk(audio_chunk)
+
+    #         if len(audio_chunk) <= 8192 and self.void_counter > 1:
+    #             break
+
+    #         # Вызываем process_iter только один раз за итерацию
+    #         outcome = self.asr_proc.process_iter()
+    #         if outcome is None:
+    #             break
+
+    #         # Получаем хвост текста и убираем фигурные скобки
+    #         buff_tail = self.asr_proc.get_tail()
+    #         buff_tail_cleaned = buff_tail.replace("{", "").replace("}", "")
+
+    #         # Обрезаем буфер
+    #         self.audio_buffer = (
+    #             self.trim_at_sentence_boundary(self.audio_buffer, buff_tail_cleaned)
+    #             if self.has_punctuation(buff_tail_cleaned)
+    #             else self.trim_at_clause_boundary(self.audio_buffer, buff_tail_cleaned)
+    #         )
+
+    #         # Отправляем результат
+    #         send_error = not await self.send_result(outcome, buff_tail_cleaned)
+
+    #     logger.info("ASR process completed with send_error: {send_error}")
+    #     final_text = self.asr_proc.finish()
+    #     logger.info(f"Final transcription: {final_text}")
+
+    #     if final_text and final_text[-1]:
+    #         return await self.send_result(final_text, "")
+    #     return await self.send_result((None, None, ''), "")
+ ###########################
+    class AsyncServerProcessor:
+        def __init__(self, connection: AsyncConnection, online_asr_proc, min_chunk: float, language: str = "en"):
+            self.connection = connection
+            self.asr_proc = online_asr_proc
+            self.min_chunk = min_chunk
+            self.language = language
+            self.audio_buffer = np.array([], dtype=np.float32)
+            self.last_end = None
+            self.is_first = True
+            self.void_counter = 0
+            self.max_void = 5
+
+        def has_punctuation(self, text: str) -> bool:
+            if self.language in ["en", "ru"]:
+                return any(punc in text for punc in [".", "!", "?"])
+            return "." in text
+
+        def trim_at_sentence_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+            if buffer is None:
+                logger.warning("Buffer is None, returning empty buffer")
+                return np.array([], dtype=np.float32)
+
+            if self.has_punctuation(text):
+                last_punc_end_pos = max(text.rfind("."), text.rfind("!"), text.rfind("?"))
+                if last_punc_end_pos != -1:
+                    logger.debug(f"Trimming buffer at last punctuation position: {last_punc_end_pos}")
+                    return buffer[:last_punc_end_pos + 1]
+
+            return buffer
+
+        def trim_at_clause_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+            if buffer is None:
+                logger.warning("Buffer is None, returning empty buffer")
+                return np.array([], dtype=np.float32)
+
+            last_punc_mid_pos = max(text.rfind(","), text.rfind(":"))
+            if last_punc_mid_pos != -1:
+                logger.debug(f"Trimming buffer at last punctuation position: {last_punc_mid_pos}")
+                return buffer[:last_punc_mid_pos + 1]
+
+            return buffer
+
+        def format_output_transcript(self, o, t):
+            if o[0] is not None:
+                beg, end = o[0] * 1000, o[1] * 1000
+                if self.last_end is not None:
+                    beg = max(beg, self.last_end)
+
+                self.last_end = end
+                text_commit = o[2]
+                return f"[ {beg:.0f}, {end:.0f}, {end - beg:.0f} ] {text_commit}"
+
+            logger.debug("No text in this segment")
+            return None
+
+        async def send_result(self, o, t):
+            msg = self.format_output_transcript(o, t)
+            try:
+                if msg is not None:
+                    await self.connection.send(msg)
+                if t is not None:
+                    # Убираем фигурные скобки, если они не нужны
+                    t_cleaned = t.replace("{", "").replace("}", "")
+                    await self.connection.send(t_cleaned)
+                return True
+            except BrokenPipeError:
+                logger.info("Broken pipe -- connection closed?")
+                return False
+
+        async def receive_audio_chunk(self) -> Optional[np.ndarray]:
+            out = []
+            min_limit = self.min_chunk * SAMPLING_RATE
+
+            while sum(len(x) for x in out) < min_limit:
+                raw_bytes = await self.connection.receive_audio()
+                if not raw_bytes:
+                    self.void_counter += 1
+                    break
+
+                self.void_counter = 0
+                with soundfile.SoundFile(
+                    io.BytesIO(raw_bytes),
+                    channels=1,
+                    endian="LITTLE",
+                    samplerate=SAMPLING_RATE,
+                    subtype="PCM_16",
+                    format="RAW",
+                ) as sf:
+                    audio, _ = librosa.load(sf, sr=SAMPLING_RATE, dtype=np.float32)
+                    out.append(audio)
+
+            if not out:
+                return None
+
+            conc = np.concatenate(out)
+            if self.is_first and len(conc) < min_limit:
+                return None
+
+            self.is_first = False
+            return conc
+
+        async def process(self):
+            self.asr_proc.init()
+            send_error = False
+            outcome = None
+
+            while not send_error and self.void_counter < self.max_void:
+                audio_chunk = await self.receive_audio_chunk()
+                if audio_chunk is None:
+                    continue
+
+                logger.info(f"Received audio chunk of length: {len(audio_chunk)}")
+                self.asr_proc.insert_audio_chunk(audio_chunk)
+
+                if len(audio_chunk) <= 8192 and self.void_counter > 1:
+                    break
+
+                # Вызываем process_iter только один раз за итерацию
+                outcome = self.asr_proc.process_iter()
+                if outcome is None:
+                    break
+
+                # Получаем хвост текста и убираем фигурные скобки
+                buff_tail = self.asr_proc.get_tail()
+                buff_tail_cleaned = buff_tail.replace("{", "").replace("}", "")
+
+                # Обрезаем буфер
+                self.audio_buffer = (
+                    self.trim_at_sentence_boundary(self.audio_buffer, buff_tail_cleaned)
+                    if self.has_punctuation(buff_tail_cleaned)
+                    else self.trim_at_clause_boundary(self.audio_buffer, buff_tail_cleaned)
+                )
+
+                # Отправляем результат
+                send_error = not await self.send_result(outcome, buff_tail_cleaned)
+
+            logger.info("ASR process completed with send_error: {send_error}")
+            final_text = self.asr_proc.finish()
+            logger.info(f"Final transcription: {final_text}")
+
+            if final_text and final_text[-1]:
+                return await self.send_result(final_text, "")
+            return await self.send_result((None, None, ''), "")       
 #########################
 def create_tokenizer(lan):
     """returns an object that has split function that works like the one of MosesTokenizer"""
