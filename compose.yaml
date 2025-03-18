@@ -16,7 +16,7 @@ services:
       - ~/.cache/huggingface:/root/.cache/huggingface
     environment:
       # - WHISPER_BUFFER_TRIMMING=sentence
-      - WHISPER_MODEL=large-v3
+      - WHISPER_MODEL=large-v3-turbo
       - WHISPER_LANG=${WHISPER_LANG:-ru}
       - WHISPER_TASK=${WHISPER_TASK:-transcribe}
       - WHISPER_VAC=True
