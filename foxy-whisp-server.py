@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 import sys
 import argparse
 import os
@@ -9,7 +9,9 @@ import select
 import io
 import soundfile #as sf
 import librosa
-import asyncio
+import socket
+import line_packet
+import psutil
 from functools import lru_cache
 import math
 from typing import List, Tuple, Optional, Any, IO
@@ -72,7 +74,7 @@ def add_shared_args(parser):
     parser.add_argument('--buffer-trimming-sec', type=float, default=15, help="Порог обрезки буфера в секундах.")
     parser.add_argument("-l", "--log-level", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='DEBUG', help="Уровень логирования.")
 
-# Фуyкция устанавливает пакет с помощью pip, если он не установлен.
+# Фуекция устанавливает пакет с помощью pip, если он не установлен.
 def install_package(package_name: str):
     """Устанавливает пакет с помощью pip, если он не установлен."""
     try:
@@ -709,56 +711,66 @@ class HypothesisBuffer:
         """
         return self.buffer
     
+#######################################################################################################
+class Connection:
+    '''It wraps conn object for non-blocking audio receiving.'''
 
-#######################################################################################
-class AsyncConnection:
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        self.reader = reader
-        self.writer = writer
+    SELECT_DELAY = 0.1  # Delay for each select call in seconds
+
+    def __init__(self, conn, timeout=1):
+        """
+        :param conn: socket connection object
+        :param timeout: timeout in seconds for data inactivity
+        """
+        self.conn = conn
         self.last_line = ""
+        self.timeout = timeout
+        self.conn.setblocking(False)  # Set the socket to non-blocking mode
+        self.max_cycles = int(timeout / self.SELECT_DELAY)  # Calculate max cycles based on timeout
 
-    def is_connected(self):
-        """Проверяет, активно ли соединение."""
-        return not self.writer.is_closing()
-
-    async def send(self, line: str):
-        """Отправляет строку клиенту, если соединение активно."""
-        if not self.is_connected():
-            logger.warning("Connection is closed, skipping send.")
-            return
-
+    def send(self, line):
+        '''It doesn't send the same line twice, to avoid duplicate transmissions.'''
         if line == self.last_line:
             return
+        line_packet.send_one_line(self.conn, line)
+        self.last_line = line
 
-        try:
-            self.writer.write(line.encode())
-            await self.writer.drain()
-            self.last_line = line
-        except (BrokenPipeError, ConnectionResetError) as e:
-            logger.warning(f"Connection lost while sending data: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error while sending data: {e}")
+    def receive_lines(self):
+        '''Receive lines of text data.'''
+        return line_packet.receive_lines(self.conn)
 
-    async def receive_audio(self) -> Optional[bytes]:
-        """Асинхронно получает аудиоданные от клиента."""
-        try:
-            data = await self.reader.read(PACKET_SIZE)
-            if not data:
-                return None  # Клиент закрыл соединение
-            return data
-        except ConnectionResetError:
-            return None  # Клиент отключился
-        except asyncio.TimeoutError:
-            return None  # Таймаут
-        
+    def non_blocking_receive_audio(self):
+        """
+        Receive audio data in a non-blocking manner.
+        Wait for data until timeout or socket closure.
+        Return data immediately if available, or None on timeout.
+        """
+        cycles = 0
+
+        while cycles < self.max_cycles:
+            # Check if the socket has data ready to read
+            ready = select.select([self.conn], [], [], self.SELECT_DELAY)  # Short timeout for polling
+            if ready[0]:
+                try:
+                    raw_bytes = self.conn.recv(PACKET_SIZE)
+                    if raw_bytes != b"":
+                        return raw_bytes  # Return immediately if data is received
+                except BlockingIOError:
+                    pass
+                except ConnectionResetError:
+                    self.socket_closed = True
+                    return None  # Connection was reset
+            
+            cycles += 1 # Increment the cycle count if no data is received
+        return None  # Return None after timeout
+
 ################# NEW VERSION #################################################
-
-class AsyncServerProcessor:
-    def __init__(self, connection: AsyncConnection, online_asr_proc, min_chunk: float, language: str = "en"):
+class ServerProcessor:
+    def __init__(self, connection, online_asr_proc, min_chunk, language="en"):
         """Инициализирует процессор для обработки аудиопотока от клиента.
 
         Args:
-            connection: Асинхронное соединение с клиентом.
+            connection: Объект соединения с клиентом.
             online_asr_proc: Процессор онлайн-транскрипции.
             min_chunk: Минимальный размер аудиофрагмента.
             language: Язык транскрипции (по умолчанию "en").
@@ -767,13 +779,51 @@ class AsyncServerProcessor:
         self.asr_proc = online_asr_proc
         self.min_chunk = min_chunk
         self.language = language
-        self.audio_buffer = np.array([], dtype=np.float32)
-        self.last_end = None
-        self.is_first = True
-        self.void_counter = 0
-        self.max_void = 5
 
-    def has_punctuation(self, text: str) -> bool:
+        self.audio_buffer = np.array([], dtype=np.float32)  # Буфер для аудиоданных
+        self.last_end = None  # Время окончания последнего сегмента
+        self.is_first = True  # Флаг первого фрагмента
+        self.void_counter = 0  # Счетчик пустых фрагментов
+        self.max_void = 5  # Максимальное количество пустых фрагментов перед завершением
+
+    def receive_audio_chunk(self):
+        """Получает и обрабатывает аудиофрагмент.
+
+        Returns:
+            np.ndarray: Аудиоданные или None, если данные отсутствуют.
+        """
+        out = []
+        min_limit = self.min_chunk * SAMPLING_RATE
+
+        while sum(len(x) for x in out) < min_limit:
+            raw_bytes = self.connection.non_blocking_receive_audio()
+            if not raw_bytes:
+                self.void_counter += 1
+                break
+
+            self.void_counter = 0
+            with soundfile.SoundFile(
+                io.BytesIO(raw_bytes),
+                channels=1,
+                endian="LITTLE",
+                samplerate=SAMPLING_RATE,
+                subtype="PCM_16",
+                format="RAW",
+            ) as sf:
+                audio, _ = librosa.load(sf, sr=SAMPLING_RATE, dtype=np.float32)
+                out.append(audio)
+
+        if not out:
+            return None
+
+        conc = np.concatenate(out)
+        if self.is_first and len(conc) < min_limit:
+            return None
+
+        self.is_first = False
+        return conc
+
+    def has_punctuation(self, text):
         """Проверяет, содержит ли текст знаки препинания, завершающие предложение.
 
         Args:
@@ -786,7 +836,7 @@ class AsyncServerProcessor:
             return any(punc in text for punc in [".", "!", "?"])
         return "." in text
 
-    def trim_at_sentence_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+    def trim_at_sentence_boundary(self, buffer, text):
         """Обрезает буфер на границе предложения.
 
         Args:
@@ -808,7 +858,7 @@ class AsyncServerProcessor:
 
         return buffer
 
-    def trim_at_clause_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
+    def trim_at_clause_boundary(self, buffer, text):
         """Обрезает буфер на границе предложения или клаузы.
 
         Args:
@@ -851,73 +901,35 @@ class AsyncServerProcessor:
         logger.debug("No text in this segment")
         return None
 
-       
-    async def send_result(self, o, t):
-        if self.connection.writer.is_closing():
-            logger.warning("Connection is closing, skipping send.")
-            return False
+    def send_result(self, o, t):
+        """Отправляет результат транскрипции клиенту.
 
+        Args:
+            o: Кортеж (начало, конец, текст).
+            t: Текст для отправки.
+
+        Returns:
+            bool: True, если отправка успешна, иначе False.
+        """
         msg = self.format_output_transcript(o, t)
         try:
             if msg is not None:
-                print(f">>>>>>>>>>>>>>>>>>{msg}==========================================")
-                await self.connection.send(msg)
+                self.connection.send(msg)
             if t is not None:
-                print(f">>>>>>>>>>>>>>>>>>{t}==========================================")
-                await self.connection.send(t)
+                self.connection.send(t)
             return True
-        except (BrokenPipeError, ConnectionResetError) as e:
-            logger.warning(f"Connection lost while sending data: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error while sending data: {e}")
+        except BrokenPipeError:
+            logger.info("Broken pipe -- connection closed?")
             return False
 
-
-    async def receive_audio_chunk(self) -> Optional[np.ndarray]:
-        """Асинхронно получает и обрабатывает аудиофрагмент.
-
-        Returns:
-            np.ndarray: Аудиоданные или None, если данные отсутствуют.
-        """
-        out = []
-        min_limit = self.min_chunk * SAMPLING_RATE
-
-        while sum(len(x) for x in out) < min_limit:
-            raw_bytes = await self.connection.receive_audio()
-            if not raw_bytes:
-                self.void_counter += 1
-                break
-
-            self.void_counter = 0
-            with soundfile.SoundFile(
-                io.BytesIO(raw_bytes),
-                channels=1,
-                endian="LITTLE",
-                samplerate=SAMPLING_RATE,
-                subtype="PCM_16",
-                format="RAW",
-            ) as sf:
-                audio, _ = librosa.load(sf, sr=SAMPLING_RATE, dtype=np.float32)
-                out.append(audio)
-
-        if not out:
-            return None
-
-        conc = np.concatenate(out)
-        if self.is_first and len(conc) < min_limit:
-            return None
-
-        self.is_first = False
-        return conc
-    
-    async def process(self):
+    def process(self):
+        """Обрабатывает аудиопоток от клиента с обрезкой по знакам препинания."""
         self.asr_proc.init()
         send_error = False
         outcome = None
 
         while not send_error and self.void_counter < self.max_void:
-            audio_chunk = await self.receive_audio_chunk()
+            audio_chunk = self.receive_audio_chunk()
             if audio_chunk is None:
                 continue
 
@@ -938,165 +950,35 @@ class AsyncServerProcessor:
                 else self.trim_at_clause_boundary(self.audio_buffer, buff_tail)
             )
 
-            # Проверяем, активно ли соединение перед отправкой
-            if self.connection.writer.is_closing():
-                logger.warning("Connection is closing, stopping processing.")
-                break
-
-            send_error = not await self.send_result(outcome, buff_tail)
+            send_error = not self.send_result(outcome, buff_tail)
 
         logger.info("ASR process completed with send_error: {send_error}")
         final_text = self.asr_proc.finish()
         logger.info(f"Final transcription: {final_text}")
 
         if final_text and final_text[-1]:
-            return await self.send_result(final_text, "")
-        return await self.send_result((None, None, ''), "")
+            return self.send_result(final_text, "")
+        return self.send_result((None, None, ''), "")
 
- ###########################
-    # class AsyncServerProcessor:
-    #     def __init__(self, connection: AsyncConnection, online_asr_proc, min_chunk: float, language: str = "en"):
-    #         self.connection = connection
-    #         self.asr_proc = online_asr_proc
-    #         self.min_chunk = min_chunk
-    #         self.language = language
-    #         self.audio_buffer = np.array([], dtype=np.float32)
-    #         self.last_end = None
-    #         self.is_first = True
-    #         self.void_counter = 0
-    #         self.max_void = 5
+##########################
+def get_port_status(port):
+    listening = False
+    has_connections = False
 
-    #     def has_punctuation(self, text: str) -> bool:
-    #         if self.language in ["en", "ru"]:
-    #             return any(punc in text for punc in [".", "!", "?"])
-    #         return "." in text
+    for conn in psutil.net_connections(kind='inet'):
+        if conn.laddr.port == port:
+            if conn.status == "LISTEN":
+                listening = True
+            elif conn.status == "ESTABLISHED":
+                has_connections = True
 
-    #     def trim_at_sentence_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
-    #         if buffer is None:
-    #             logger.warning("Buffer is None, returning empty buffer")
-    #             return np.array([], dtype=np.float32)
-
-    #         if self.has_punctuation(text):
-    #             last_punc_end_pos = max(text.rfind("."), text.rfind("!"), text.rfind("?"))
-    #             if last_punc_end_pos != -1:
-    #                 logger.debug(f"Trimming buffer at last punctuation position: {last_punc_end_pos}")
-    #                 return buffer[:last_punc_end_pos + 1]
-
-    #         return buffer
-
-    #     def trim_at_clause_boundary(self, buffer: np.ndarray, text: str) -> np.ndarray:
-    #         if buffer is None:
-    #             logger.warning("Buffer is None, returning empty buffer")
-    #             return np.array([], dtype=np.float32)
-
-    #         last_punc_mid_pos = max(text.rfind(","), text.rfind(":"))
-    #         if last_punc_mid_pos != -1:
-    #             logger.debug(f"Trimming buffer at last punctuation position: {last_punc_mid_pos}")
-    #             return buffer[:last_punc_mid_pos + 1]
-
-    #         return buffer
-
-    #     def format_output_transcript(self, o, t):
-    #         if o[0] is not None:
-    #             beg, end = o[0] * 1000, o[1] * 1000
-    #             if self.last_end is not None:
-    #                 beg = max(beg, self.last_end)
-
-    #             self.last_end = end
-    #             text_commit = o[2]
-    #             return f"[ {beg:.0f}, {end:.0f}, {end - beg:.0f} ] {text_commit}"
-
-    #         logger.debug("No text in this segment")
-    #         return None
-
-    #     async def send_result(self, o, t):
-    #         msg = self.format_output_transcript(o, t)
-    #         try:
-    #             if msg is not None:
-    #                 await self.connection.send(msg)
-    #             if t is not None:
-    #                 # Убираем фигурные скобки, если они не нужны
-    #                 t_cleaned = t.replace("{", "").replace("}", "")
-    #                 await self.connection.send(t_cleaned)
-    #             return True
-    #         except BrokenPipeError:
-    #             logger.info("Broken pipe -- connection closed?")
-    #             return False
-
-    #     async def receive_audio_chunk(self) -> Optional[np.ndarray]:
-    #         out = []
-    #         min_limit = self.min_chunk * SAMPLING_RATE
-
-    #         while sum(len(x) for x in out) < min_limit:
-    #             raw_bytes = await self.connection.receive_audio()
-    #             if not raw_bytes:
-    #                 self.void_counter += 1
-    #                 break
-
-    #             self.void_counter = 0
-    #             with soundfile.SoundFile(
-    #                 io.BytesIO(raw_bytes),
-    #                 channels=1,
-    #                 endian="LITTLE",
-    #                 samplerate=SAMPLING_RATE,
-    #                 subtype="PCM_16",
-    #                 format="RAW",
-    #             ) as sf:
-    #                 audio, _ = librosa.load(sf, sr=SAMPLING_RATE, dtype=np.float32)
-    #                 out.append(audio)
-
-    #         if not out:
-    #             return None
-
-    #         conc = np.concatenate(out)
-    #         if self.is_first and len(conc) < min_limit:
-    #             return None
-
-    #         self.is_first = False
-    #         return conc
-
-    #     async def process(self):
-    #         self.asr_proc.init()
-    #         send_error = False
-    #         outcome = None
-
-    #         while not send_error and self.void_counter < self.max_void:
-    #             audio_chunk = await self.receive_audio_chunk()
-    #             if audio_chunk is None:
-    #                 continue
-
-    #             logger.info(f"Received audio chunk of length: {len(audio_chunk)}")
-    #             self.asr_proc.insert_audio_chunk(audio_chunk)
-
-    #             if len(audio_chunk) <= 8192 and self.void_counter > 1:
-    #                 break
-
-    #             # Вызываем process_iter только один раз за итерацию
-    #             outcome = self.asr_proc.process_iter()
-    #             if outcome is None:
-    #                 break
-
-    #             # Получаем хвост текста и убираем фигурные скобки
-    #             buff_tail = self.asr_proc.get_tail()
-    #             buff_tail_cleaned = buff_tail.replace("{", "").replace("}", "")
-
-    #             # Обрезаем буфер
-    #             self.audio_buffer = (
-    #                 self.trim_at_sentence_boundary(self.audio_buffer, buff_tail_cleaned)
-    #                 if self.has_punctuation(buff_tail_cleaned)
-    #                 else self.trim_at_clause_boundary(self.audio_buffer, buff_tail_cleaned)
-    #             )
-
-    #             # Отправляем результат
-    #             send_error = not await self.send_result(outcome, buff_tail_cleaned)
-
-    #         logger.info("ASR process completed with send_error: {send_error}")
-    #         final_text = self.asr_proc.finish()
-    #         logger.info(f"Final transcription: {final_text}")
-
-    #         if final_text and final_text[-1]:
-    #             return await self.send_result(final_text, "")
-    #         return await self.send_result((None, None, ''), "")       
+    if listening and has_connections:
+        return 1  # Port is listening and has connections
+    elif listening:
+        return 2  # Port is listening but has no connections
+    else:
+        return 0  # Port is not listening
+    
 #########################
 def create_tokenizer(lan):
     """returns an object that has split function that works like the one of MosesTokenizer"""
@@ -1177,48 +1059,10 @@ def asr_factory(args, logfile=sys.stderr):
 
     return asr, online
 
-# async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, online_asr_proc, min_chunk):
-#     """Обрабатывает подключение клиента."""
-#     connection = AsyncConnection(reader, writer)
-#     processor = AsyncServerProcessor(connection, online_asr_proc, min_chunk)
-#     await processor.process()
-#     writer.close()
-#     await writer.wait_closed()
-#     logger.info("Client disconnected")
-
-async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, online_asr_proc, min_chunk):
-    """Обрабатывает подключение клиента."""
-    connection = AsyncConnection(reader, writer)
-    processor = AsyncServerProcessor(connection, online_asr_proc, min_chunk)
-    try:
-        await processor.process()
-    except (BrokenPipeError, ConnectionResetError) as e:
-        logger.warning(f"Client disconnected unexpectedly: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error in client handler: {e}")
-    finally:
-        if not writer.is_closing():
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception as e:
-                logger.error(f"Error while closing writer: {e}")
-        logger.info("Client disconnected")
-
-
-async def main(host: str, port: int, online_asr_proc, min_chunk: float):
-    """Запускает асинхронный сервер."""
-    server = await asyncio.start_server(
-        lambda r, w: handle_client(r, w, online_asr_proc, min_chunk),
-        host, port
-    )
-    async with server:
-        logger.info(f"Server started on {host}:{port}")
-        await server.serve_forever()
 
 ###########################
 # Основной цикл сервера
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default='0.0.0.0')
     parser.add_argument("--port", type=int, default=43007)
@@ -1237,8 +1081,27 @@ if __name__ == "__main__":
     else:
         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
 
-    asyncio.run(main(args.host, args.port, online, args.min_chunk_size))
 
+    # Server loop
+    if get_port_status(args.port) == 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((args.host, args.port))
+            s.listen(1)
+            logger.info('Listening on' + str((args.host, args.port)))
+            while get_port_status(args.port) > 0:
+                conn, addr = s.accept()
+                logger.info('Connected to client on {}'.format(addr))
+                connection = Connection(conn)
+                while get_port_status(args.port) == 1:
+                    proc = ServerProcessor(connection, online, args.min_chunk_size)
+                    if not proc.process():
+                        break
+                conn.close()
+                logger.info('Connection to client closed')
+        logger.info('Connection closed, terminating.')
+    else:
+        logger.info(f'port {args.port} already IN USE, terminating.')
 
 if __name__ == "__main__":
     main()
+    

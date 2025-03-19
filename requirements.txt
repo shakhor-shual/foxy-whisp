@@ -1,3 +1,9 @@
 numpy
 soundfile
 librosa
+faster-whisper 
+numpy 
+torch 
+torchaudio  
+tokenize_uk 
+opus-fast-mosestokenizer==0.0.8.2
