@@ -44,6 +44,7 @@ def send_one_line(socket, text, pad_zeros=False):
         else:
             packet = data[offset:offset+PACKET_SIZE]
         socket.sendall(packet)
+        
 
 
 def receive_one_line(socket):

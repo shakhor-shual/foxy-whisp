@@ -18,6 +18,7 @@ from typing import List, Tuple, Optional, Any, IO
 from abc import ABC, abstractmethod
 import subprocess
 import importlib
+from mqtt_handler import MQTTHandler
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -32,6 +33,8 @@ MAX_PROMPT_SIZE = 180  # Максимальная длина подсказки 
 MAX_INCOMPLETE_SIZE =200 # Максимальная длина непотвержденного фрагмента
 MAX_TAIL_SIZE = 500  # Максимальная длина хвоста текста
 
+CONNECTION_SELECT_DELAY = 0.1  # Delay for each select call in seconds
+CONNECTION_TOPIC="foxy-whisp"
 
 logger = logging.getLogger(__name__)
 
@@ -614,7 +617,7 @@ class OpenaiApiASR(ASRBase):
         self.use_vad_opt = True
 
 
-############################ NEW-VERSION ################################################
+############################################################################
 class HypothesisBuffer:
     def __init__(self, logfile=sys.stderr):
         """Инициализирует буфер гипотез.
@@ -714,25 +717,29 @@ class HypothesisBuffer:
 #######################################################################################################
 class Connection:
     '''It wraps conn object for non-blocking audio receiving.'''
-
-    SELECT_DELAY = 0.1  # Delay for each select call in seconds
-
-    def __init__(self, conn, timeout=1):
+    def __init__(self, conn, mqtt_handler, tcp_echo =True, timeout=1):
         """
         :param conn: socket connection object
         :param timeout: timeout in seconds for data inactivity
         """
+        self.tcp_echo=tcp_echo
+        self.mqtt_handler=mqtt_handler
         self.conn = conn
         self.last_line = ""
         self.timeout = timeout
         self.conn.setblocking(False)  # Set the socket to non-blocking mode
-        self.max_cycles = int(timeout / self.SELECT_DELAY)  # Calculate max cycles based on timeout
+        self.max_cycles = int(timeout / CONNECTION_SELECT_DELAY)  # Calculate max cycles based on timeout
 
     def send(self, line):
         '''It doesn't send the same line twice, to avoid duplicate transmissions.'''
         if line == self.last_line:
             return
-        line_packet.send_one_line(self.conn, line)
+        
+        payload= line.split("]", 1)[1].strip() if line.startswith("[") else None
+        if payload and self.mqtt_handler.connected:
+            self.mqtt_handler.publish_message(CONNECTION_TOPIC, payload)
+        if self.tcp_echo:
+            line_packet.send_one_line(self.conn, line)
         self.last_line = line
 
     def receive_lines(self):
@@ -749,7 +756,7 @@ class Connection:
 
         while cycles < self.max_cycles:
             # Check if the socket has data ready to read
-            ready = select.select([self.conn], [], [], self.SELECT_DELAY)  # Short timeout for polling
+            ready = select.select([self.conn], [], [], CONNECTION_SELECT_DELAY)  # Short timeout for polling
             if ready[0]:
                 try:
                     raw_bytes = self.conn.recv(PACKET_SIZE)
@@ -764,9 +771,9 @@ class Connection:
             cycles += 1 # Increment the cycle count if no data is received
         return None  # Return None after timeout
 
-################# NEW VERSION #################################################
+##################################################################
 class ServerProcessor:
-    def __init__(self, connection, online_asr_proc, min_chunk, language="en"):
+    def __init__(self, connection,  online_asr_proc, min_chunk, language="en"):
         """Инициализирует процессор для обработки аудиопотока от клиента.
 
         Args:
@@ -1082,18 +1089,31 @@ def main():
         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
 
 
+    mqtt_handler = MQTTHandler()
+    mqtt_handler.connect_to_external_broker()
+
+    if not mqtt_handler.connected:
+        mqtt_handler.start_embedded_broker()
+
+    if mqtt_handler.connected:
+        mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
+    else:
+        logging.error("MQTT client is not connected. Unable to publish message.")
+
     # Server loop
     if get_port_status(args.port) == 0:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((args.host, args.port))
             s.listen(1)
             logger.info('Listening on' + str((args.host, args.port)))
+            
             while get_port_status(args.port) > 0:
                 conn, addr = s.accept()
                 logger.info('Connected to client on {}'.format(addr))
-                connection = Connection(conn)
+                connection = Connection(conn, mqtt_handler, tcp_echo =True)
+
                 while get_port_status(args.port) == 1:
-                    proc = ServerProcessor(connection, online, args.min_chunk_size)
+                    proc = ServerProcessor(connection,  online, args.min_chunk_size)
                     if not proc.process():
                         break
                 conn.close()
