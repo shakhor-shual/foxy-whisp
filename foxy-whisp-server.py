@@ -19,6 +19,10 @@ from abc import ABC, abstractmethod
 import subprocess
 import importlib
 from mqtt_handler import MQTTHandler
+import tkinter as tk
+from tkinter import ttk
+import threading
+
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -76,6 +80,7 @@ def add_shared_args(parser):
     parser.add_argument('--vac-chunk-size', type=float, default=0.04, help="Размер фрагмента для VAC в секундах.")
     parser.add_argument('--buffer-trimming-sec', type=float, default=15, help="Порог обрезки буфера в секундах.")
     parser.add_argument("-l", "--log-level", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='DEBUG', help="Уровень логирования.")
+    parser.add_argument("--gui", action="store_true", help="Запустить сервер с графическим интерфейсом.")
 
 # Фуекция устанавливает пакет с помощью pip, если он не установлен.
 def install_package(package_name: str):
@@ -1067,18 +1072,92 @@ def asr_factory(args, logfile=sys.stderr):
     return asr, online
 
 
-###########################
-# Основной цикл сервера
+# ###########################
+# # Основной цикл сервера
+# def main():
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--host", type=str, default='0.0.0.0')
+#     parser.add_argument("--port", type=int, default=43007)
+#     parser.add_argument("--warmup-file", type=str, dest="warmup_file",
+#                         help="Path to a speech audio file to warm up Whisper.")
+#     add_shared_args(parser)
+#     args = parser.parse_args()
+
+#     set_logging(args, logger)
+
+#     asr, online = asr_factory(args)
+#     if args.warmup_file and os.path.isfile(args.warmup_file):
+#         a = load_audio_chunk(args.warmup_file, 0, 1)
+#         asr.transcribe(a)
+#         logger.info("Whisper is warmed up.")
+#     else:
+#         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
+
+
+#     mqtt_handler = MQTTHandler()
+#     mqtt_handler.connect_to_external_broker()
+
+#     if not mqtt_handler.connected:
+#         mqtt_handler.start_embedded_broker()
+
+#     if mqtt_handler.connected:
+#         mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
+#     else:
+#         logging.error("MQTT client is not connected. Unable to publish message.")
+
+#     # Server loop
+#     if get_port_status(args.port) == 0:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#             s.bind((args.host, args.port))
+#             s.listen(1)
+#             logger.info('Listening on' + str((args.host, args.port)))
+            
+#             while get_port_status(args.port) > 0:
+#                 conn, addr = s.accept()
+#                 logger.info('Connected to client on {}'.format(addr))
+#                 connection = Connection(conn, mqtt_handler, tcp_echo =True)
+
+#                 while get_port_status(args.port) == 1:
+#                     proc = ServerProcessor(connection,  online, args.min_chunk_size)
+#                     if not proc.process():
+#                         break
+#                 conn.close()
+#                 logger.info('Connection to client closed')
+#         logger.info('Connection closed, terminating.')
+#     else:
+#         logger.info(f'port {args.port} already IN USE, terminating.')
+
+# if __name__ == "__main__":
+#     main()
+
+# Модифицируем функцию main для поддержки GUI
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default='0.0.0.0')
     parser.add_argument("--port", type=int, default=43007)
     parser.add_argument("--warmup-file", type=str, dest="warmup_file",
                         help="Path to a speech audio file to warm up Whisper.")
-    add_shared_args(parser)
+    add_shared_args(parser)  # Добавляем общие аргументы
+    #add_gui_arg(parser)  # Добавляем параметр --gui
     args = parser.parse_args()
 
+    if args.gui:
+        # Запуск GUI
+        root = tk.Tk()
+        app = ServerGUI(root, parser, args)  # Передаем parser и args
+        root.mainloop()
+    else:
+        # Запуск сервера в консольном режиме
+        run_server(args)
+
+# Функция для запуска сервера
+def run_server(args, stop_event=None):
     set_logging(args, logger)
+
+    # Проверяем, что модель не пустая
+    if not args.model:
+        logger.error("Модель не может быть пустой. Установлено значение по умолчанию: large-v3-turbo.")
+        args.model = "large-v3-turbo"
 
     asr, online = asr_factory(args)
     if args.warmup_file and os.path.isfile(args.warmup_file):
@@ -1087,7 +1166,6 @@ def main():
         logger.info("Whisper is warmed up.")
     else:
         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
-
 
     mqtt_handler = MQTTHandler()
     mqtt_handler.connect_to_external_broker()
@@ -1105,23 +1183,225 @@ def main():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((args.host, args.port))
             s.listen(1)
+            s.settimeout(1)  # Устанавливаем таймаут для accept(), чтобы не блокировать навсегда
             logger.info('Listening on' + str((args.host, args.port)))
             
             while get_port_status(args.port) > 0:
-                conn, addr = s.accept()
-                logger.info('Connected to client on {}'.format(addr))
-                connection = Connection(conn, mqtt_handler, tcp_echo =True)
+                if stop_event and stop_event.is_set():  # Проверка на остановку
+                    logger.info("Server stopping due to stop event.")
+                    break
 
-                while get_port_status(args.port) == 1:
-                    proc = ServerProcessor(connection,  online, args.min_chunk_size)
-                    if not proc.process():
-                        break
-                conn.close()
-                logger.info('Connection to client closed')
+                try:
+                    conn, addr = s.accept()  # Неблокирующий accept()
+                    logger.info('Connected to client on {}'.format(addr))
+                    connection = Connection(conn, mqtt_handler, tcp_echo=True)
+
+                    while get_port_status(args.port) == 1:
+                        if stop_event and stop_event.is_set():  # Проверка на остановку
+                            logger.info("Server stopping due to stop event.")
+                            break
+
+                        proc = ServerProcessor(connection, online, args.min_chunk_size)
+                        if not proc.process():
+                            break
+                    conn.close()
+                    logger.info('Connection to client closed')
+                except socket.timeout:
+                    # Таймаут accept(), продолжаем цикл
+                    continue
+                except Exception as e:
+                    logger.error(f"Error in server loop: {e}")
+                    break
+
         logger.info('Connection closed, terminating.')
     else:
         logger.info(f'port {args.port} already IN USE, terminating.')
 
+
+class ServerGUI:
+    def __init__(self, root, parser, args):
+        self.root = root
+        self.parser = parser  # Сохраняем объект parser
+        self.args = args  # Сохраняем объект args
+        self.server_thread = None
+        self.server_running = False
+        self.stop_event = threading.Event()  # Событие для остановки сервера
+
+        self.root.title("Whisper Server GUI")
+
+        # Кнопка запуска/остановки сервера
+        self.start_stop_button = ttk.Button(root, text="Start Server", command=self.toggle_server)
+        self.start_stop_button.pack(pady=10)
+
+        # Кнопка "Advanced" для разворачивания дополнительных параметров
+        self.advanced_button = ttk.Button(root, text="Advanced", command=self.toggle_advanced)
+        self.advanced_button.pack(pady=10)
+
+        # Фрейм для дополнительных параметров
+        self.advanced_frame = ttk.Frame(root)
+        self.advanced_options_visible = False
+
+        # Кнопка Apply для применения изменений
+        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.apply_changes, state=tk.DISABLED)
+        self.apply_button.pack(pady=10)
+
+        # Словарь для хранения виджетов и их переменных
+        self.widgets = {}
+
+        # Добавляем элементы управления для всех параметров
+        self.add_parameter_controls()
+
+        # Обработка закрытия окна
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def add_parameter_controls(self):
+        """Добавляет элементы управления для всех параметров из parser."""
+        for action in self.parser._actions:
+            if action.dest == "help":  # Пропускаем аргумент --help
+                continue
+
+            frame = ttk.Frame(self.advanced_frame)
+            frame.pack(fill=tk.X, padx=5, pady=5)
+
+            ttk.Label(frame, text=action.help or action.dest).pack(side=tk.LEFT)
+
+            # Определяем тип аргумента и создаем соответствующий виджет
+            if action.choices:
+                # Параметры с choices (выпадающий список)
+                var = tk.StringVar(value=getattr(self.args, action.dest, action.default))
+                combobox = ttk.Combobox(frame, textvariable=var, values=action.choices)
+                combobox.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+                combobox.bind("<<ComboboxSelected>>", self.on_parameter_change)
+                self.widgets[action.dest] = (combobox, var)
+            elif action.type == bool or isinstance(action.default, bool):
+                # Параметры типа bool (чекбокс)
+                var = tk.BooleanVar(value=getattr(self.args, action.dest, action.default))
+                checkbutton = ttk.Checkbutton(frame, variable=var, command=self.on_parameter_change)
+                checkbutton.pack(side=tk.RIGHT)
+                self.widgets[action.dest] = (checkbutton, var)
+            elif action.type in (float, int):
+                # Параметры типа float или int (текстовое поле с валидацией)
+                var = tk.StringVar(value=str(getattr(self.args, action.dest, action.default)))
+                entry = ttk.Entry(frame, textvariable=var)
+                entry.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+                entry.bind("<KeyRelease>", self.on_parameter_change)
+                self.widgets[action.dest] = (entry, var)
+            else:
+                # Параметры типа str (текстовое поле)
+                var = tk.StringVar(value=getattr(self.args, action.dest, action.default))
+                entry = ttk.Entry(frame, textvariable=var)
+                entry.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+                entry.bind("<KeyRelease>", self.on_parameter_change)
+                self.widgets[action.dest] = (entry, var)
+
+    def on_parameter_change(self, event=None):
+        """Активирует кнопку Apply при изменении любого параметра."""
+        self.apply_button.config(state=tk.NORMAL)
+
+    def apply_changes(self):
+        """Применяет изменения параметров и перезапускает сервер."""
+        # Останавливаем сервер, если он запущен
+        if self.server_running:
+            self.stop_server()
+
+        # Обновляем объект args текущими значениями из GUI
+        for param, (widget, var) in self.widgets.items():
+            value = var.get()  # Получаем текущее значение из виджета
+
+            # Логируем значение для отладки
+            logger.debug(f"Параметр: {param}, Значение из GUI: {value}")
+
+            # Если значение — пустая строка, заменяем на None
+            if isinstance(value, str) and value.strip() == "":
+                value = None
+
+            if isinstance(value, str) and value is not None:
+                # Преобразуем строку в нужный тип
+                action = next((a for a in self.parser._actions if a.dest == param), None)
+                if action and action.type:
+                    try:
+                        # Преобразуем значение в нужный тип (int, float, bool и т.д.)
+                        if action.type == bool:
+                            value = bool(value)
+                        else:
+                            value = action.type(value)
+                    except (ValueError, TypeError):
+                        logger.error(f"Некорректное значение для параметра {param}: {value}")
+                        continue
+
+            # Устанавливаем значение в args
+            setattr(self.args, param, value)
+
+        # Проверяем, что модель не пустая
+        if not self.args.model:
+            logger.error("Модель не может быть пустой. Установлено значение по умолчанию: large-v3-turbo.")
+            self.args.model = "large-v3-turbo"
+
+        self.apply_button.config(state=tk.DISABLED)
+        logger.info("Параметры успешно применены.")
+
+        # Перезапускаем сервер, если он был запущен
+        if self.server_running:
+            self.start_server()
+
+
+    def toggle_server(self):
+        if self.server_running:
+            self.stop_server()
+        else:
+            self.start_server()
+
+    def start_server(self):
+        """Запуск сервера в отдельном потоке."""
+        if self.server_running:
+            return
+
+        # Применяем изменения перед запуском сервера
+        self.apply_changes()
+
+        self.stop_event.clear()  # Сбрасываем событие остановки
+        self.server_running = True
+        self.start_stop_button.config(text="Stop Server")
+
+        # Запуск сервера в отдельном потоке
+        self.server_thread = threading.Thread(target=self.run_server_wrapper, args=(self.args,))
+        self.server_thread.start()
+
+    def stop_server(self):
+        """Остановка сервера."""
+        if not self.server_running:
+            return
+
+        self.server_running = False
+        self.start_stop_button.config(text="Start Server")
+        self.stop_event.set()  # Устанавливаем событие остановки
+
+        # Ожидаем завершения потока сервера
+        if self.server_thread and self.server_thread.is_alive():
+            self.server_thread.join(timeout=5)  # Ожидаем завершения потока (максимум 5 секунд)
+
+    def run_server_wrapper(self, args):
+        """Обертка для запуска сервера с поддержкой остановки."""
+        try:
+            run_server(args, self.stop_event)
+        except Exception as e:
+            logger.error(f"Server error: {e}")
+        finally:
+            self.server_running = False
+            self.start_stop_button.config(text="Start Server")
+
+    def toggle_advanced(self):
+        """Разворачивает/скрывает дополнительные параметры."""
+        if self.advanced_options_visible:
+            self.advanced_frame.pack_forget()
+        else:
+            self.advanced_frame.pack(pady=10)
+        self.advanced_options_visible = not self.advanced_options_visible
+
+    def on_close(self):
+        """Обработка закрытия окна."""
+        self.stop_server()  # Останавливаем сервер
+        self.root.destroy()  # Закрываем окно
+
 if __name__ == "__main__":
     main()
-    
