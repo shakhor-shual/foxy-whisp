@@ -14,7 +14,7 @@ WORKDIR /root/foxy-whisp
 ENV PYTHONPATH=/root/foxy-whisp
 ENV LD_LIBRARY_PATH="/usr/local/lib/python3.10/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.10/site-packages/nvidia/cudnn/lib"
 # install the requirements for running the whisper server
-RUN pip install --no-cache-dir faster-whisper librosa soundfile numpy torch torchaudio  tokenize_uk opus-fast-mosestokenizer==0.0.8.2
+RUN pip install --no-cache-dir psutil faster-whisper librosa soundfile numpy torch torchaudio  tokenize_uk opus-fast-mosestokenizer==0.0.8.2
 COPY silero_vad.py /root/foxy-whisp
-COPY foxy-whisp.py /root/foxy-whisp
+COPY foxy-whisp-server.py /root/foxy-whisp
 CMD ["python", "foxy-whisp.py"]
