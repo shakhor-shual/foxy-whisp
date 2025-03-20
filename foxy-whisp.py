@@ -5,7 +5,7 @@ from logic.foxy_utils import load_audio_chunk,  add_shared_args,  set_logging, l
 from logic.asr_backends import FasterWhisperASR, OpenaiApiASR, WhisperTimestampedASR
 from logic.asr_processors import OnlineASRProcessor, VACOnlineASRProcessor
 from logic.mqtt_handler import MQTTHandler
-from logic.foxy_engine import FoxyCore, FoxySensory
+# from logic.foxy_engine import FoxyCore, FoxySensory
 from logic.local_audio_input import LocalAudioInput
 
 import sys
@@ -453,7 +453,9 @@ def asr_factory(args, logfile=sys.stderr):
 
     return asr, online
 
-##########################################
+########################################
+from logic.foxy_engine import FoxyProcessor  # Импорт нового класса
+
 def run_server(args, stop_event=None, callback=None):
     set_logging(args, logger)
 
@@ -484,9 +486,13 @@ def run_server(args, stop_event=None, callback=None):
     if args.listen == "audio_device":
         if args.audio_device is None:
             args.audio_device = LocalAudioInput.get_default_input_device()
-        local_audio_input = LocalAudioInput(device=args.audio_device)
-        local_audio_input.set_audio_callback(lambda chunk: online.insert_audio_chunk(chunk))
-        local_audio_input.start()
+        proc = FoxyProcessor(
+            asr_processor=online,
+            use_local_audio=True,
+            audio_device=args.audio_device,
+            callback=callback
+        )
+        proc.local_audio_input.start()
 
     # TCP-листенер (если выбран источник TCP)
     if args.listen == "tcp":
@@ -505,14 +511,20 @@ def run_server(args, stop_event=None, callback=None):
                     try:
                         conn, addr = s.accept()
                         logger.info('Connected to client on {}'.format(addr))
-                        sensory_object = FoxySensory(conn, mqtt_handler, tcp_echo=True, callback=callback)
+                        proc = FoxyProcessor(
+                            conn=conn,
+                            mqtt_handler=mqtt_handler,
+                            asr_processor=online,
+                            minimal_chunk=args.min_chunk_size,
+                            use_local_audio=False,
+                            callback=callback
+                        )
 
                         while get_port_status(args.port) == 1:
                             if stop_event and stop_event.is_set():
                                 logger.info("Server stopping due to stop event.")
                                 break
 
-                            proc = FoxyCore(sensory_object, online, args.min_chunk_size, use_local_audio=False)
                             if not proc.process():
                                 break
                         conn.close()
@@ -525,7 +537,80 @@ def run_server(args, stop_event=None, callback=None):
 
             logger.info('Connection closed, terminating.')
         else:
-            logger.info(f'port {args.port} already IN USE, terminating.')
+            logger.info(f'port {args.port} already IN USE, terminating.')##
+
+# def run_server(args, stop_event=None, callback=None):
+#     set_logging(args, logger)
+
+#     if not args.model:
+#         logger.error("Модель не может быть пустой. Установлено значение по умолчанию: large-v3-turbo.")
+#         args.model = "large-v3-turbo"
+
+#     asr, online = asr_factory(args)
+#     if args.warmup_file and os.path.isfile(args.warmup_file):
+#         a = load_audio_chunk(args.warmup_file, 0, 1)
+#         asr.transcribe(a)
+#         logger.info("Whisper is warmed up.")
+#     else:
+#         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
+
+#     mqtt_handler = MQTTHandler()
+#     mqtt_handler.connect_to_external_broker()
+
+#     if not mqtt_handler.connected:
+#         mqtt_handler.start_embedded_broker()
+
+#     if mqtt_handler.connected:
+#         mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
+#     else:
+#         logging.error("MQTT client is not connected. Unable to publish message.")
+
+#     # Локальный аудиоввод
+#     if args.listen == "audio_device":
+#         if args.audio_device is None:
+#             args.audio_device = LocalAudioInput.get_default_input_device()
+#         local_audio_input = LocalAudioInput(device=args.audio_device)
+#         local_audio_input.set_audio_callback(lambda chunk: online.insert_audio_chunk(chunk))
+#         local_audio_input.start()
+
+#     # TCP-листенер (если выбран источник TCP)
+#     if args.listen == "tcp":
+#         if get_port_status(args.port) == 0:
+#             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#                 s.bind((args.host, args.port))
+#                 s.listen(1)
+#                 s.settimeout(1)
+#                 logger.info('Listening on' + str((args.host, args.port)))
+                
+#                 while get_port_status(args.port) > 0:
+#                     if stop_event and stop_event.is_set():
+#                         logger.info("Server stopping due to stop event.")
+#                         break
+
+#                     try:
+#                         conn, addr = s.accept()
+#                         logger.info('Connected to client on {}'.format(addr))
+#                         sensory_object = FoxySensory(conn, mqtt_handler, tcp_echo=True, callback=callback)
+
+#                         while get_port_status(args.port) == 1:
+#                             if stop_event and stop_event.is_set():
+#                                 logger.info("Server stopping due to stop event.")
+#                                 break
+
+#                             proc = FoxyCore(sensory_object, online, args.min_chunk_size, use_local_audio=False)
+#                             if not proc.process():
+#                                 break
+#                         conn.close()
+#                         logger.info('Connection to client closed')
+#                     except socket.timeout:
+#                         continue
+#                     except Exception as e:
+#                         logger.error(f"Error in server loop: {e}")
+#                         break
+
+#             logger.info('Connection closed, terminating.')
+#         else:
+#             logger.info(f'port {args.port} already IN USE, terminating.')
 
 # ########################################################
 def main():
