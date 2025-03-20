@@ -17,7 +17,9 @@ import socket
 import tkinter as tk
 from tkinter import ttk
 import threading
-
+import tkinter as tk
+from tkinter import ttk
+import threading
 
 import tkinter as tk
 from tkinter import ttk
@@ -26,38 +28,98 @@ import threading
 class FoxyServerGUI:
     def __init__(self, root, parser, args):
         self.root = root
-        self.parser = parser  # Store parser object
-        self.args = args  # Store args object
+        self.parser = parser  
+        self.args = args  
         self.server_thread = None
         self.server_running = False
-        self.stop_event = threading.Event()  # Event to stop the server
+        self.stop_event = threading.Event()  
 
-        self.root.title("Whisper Server GUI")
+        # Устанавливаем начальный размер окна, но без запрета изменения размеров
+        self.root.geometry("300x700")
+        self.root.title("Foxy-Whisp")
 
-        # Start/Stop button
-        self.start_stop_button = ttk.Button(root, text="Start Server", command=self.toggle_server)
-        self.start_stop_button.pack(pady=10)
+        # Флаг состояния расширенных настроек
+        self.advanced_options_visible = False  
 
-        # "Advanced" button to expand additional parameters
-        self.advanced_button = ttk.Button(root, text="Advanced", command=self.toggle_advanced)
-        self.advanced_button.pack(pady=10)
+        # Главный контейнер
+        self.main_frame = ttk.Frame(root)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Frame for additional parameters
-        self.advanced_frame = ttk.Frame(root)
-        self.advanced_options_visible = False
+        # Кнопка запуска/остановки сервера
+        self.start_stop_button = ttk.Button(self.main_frame, text="Start Server", command=self.toggle_server)
+        self.start_stop_button.pack(fill=tk.X, pady=5)
 
-        # Apply button to apply changes
+        # "Advanced" button
+        self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.toggle_advanced)
+        self.advanced_button.pack(fill=tk.X, pady=5)
+
+        # Фрейм для дополнительных параметров (изначально скрыт)
+        self.advanced_frame = ttk.Frame(self.main_frame)
+
+        # Фрейм для текста и кнопок
+        self.text_frame = ttk.Frame(self.main_frame)
+        self.text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        # Фрейм с кнопками (располагается над текстовым полем)
+        self.button_frame = ttk.Frame(self.text_frame)
+        self.button_frame.pack(fill=tk.X, pady=5)
+
+        # Добавляем 4 кнопки
+        btn_font=("Monospace", 12, "bold")
+        self.clear_btn = tk.Button(self.button_frame, text="✗", font=btn_font, command=self.clear_text)
+        self.clear_btn.pack(side=tk.LEFT,  fill=tk.X, padx=2)
+
+        self.save_btn = tk.Button(self.button_frame, text="▽", font=btn_font)
+        self.save_btn.pack(side=tk.LEFT,   fill=tk.X, padx=2)
+
+        self.ask_btn = tk.Button(self.button_frame, text="?", font=btn_font)
+        self.ask_btn.pack(side=tk.RIGHT,  fill=tk.X, padx=2)
+
+        self.mute_btn = tk.Button(self.button_frame, text="▣", font=btn_font)
+        self.mute_btn.pack(side=tk.RIGHT,  fill=tk.X, padx=2)
+
+        # Фрейм для текста и прокрутки
+        self.text_area_frame = ttk.Frame(self.text_frame)
+        self.text_area_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Поле для вывода транскрипции
+        self.text_area = tk.Text(self.text_area_frame, wrap=tk.WORD, height=10)
+        self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Полоса прокрутки (остается видимой)
+        self.scrollbar = ttk.Scrollbar(self.text_area_frame, orient=tk.VERTICAL, command=self.text_area.yview)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.text_area.config(yscrollcommand=self.scrollbar.set)
+
+        # Кнопка "Apply"
         self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.apply_changes, state=tk.DISABLED)
-        self.apply_button.pack(pady=10)
+        self.apply_button.pack(fill=tk.X, pady=5)
 
-        # Dictionary to store widgets and their variables
+        # Контейнер для параметров
         self.widgets = {}
 
-        # Add UI controls for all parameters
         self.add_parameter_controls()
 
-        # Handle window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        self.callback = self.append_text  # Используем метод append_text как callback
+
+
+#########################################################
+
+    def append_text(self, text):
+        """Добавляет текст в поле вывода и автоматически прокручивает вниз"""
+        self.text_area.config(state=tk.NORMAL)  # Разрешаем редактирование
+        self.text_area.insert(tk.END, text)  # Вставляем текст в конец
+        self.text_area.see(tk.END)  # Прокручиваем вниз
+        self.text_area.config(state=tk.DISABLED)  # Блокируем редактирование
+
+    def clear_text(self):
+        """Очищает текстовое поле"""
+        self.text_area.config(state=tk.NORMAL)
+        self.text_area.delete(1.0, tk.END)
+        self.text_area.config(state=tk.DISABLED)
+
 
     def add_parameter_controls(self):
         """Adds UI controls for all parameters from the parser."""
@@ -182,7 +244,8 @@ class FoxyServerGUI:
         self.server_running = True
         self.start_stop_button.config(text="Stop Server")
 
-        self.server_thread = threading.Thread(target=self.run_server_wrapper, args=(self.args,))
+        # Передаем callback-функцию в run_server
+        self.server_thread = threading.Thread(target=self.run_server_wrapper, args=(self.args, self.stop_event, self.callback))
         self.server_thread.start()
 
     def stop_server(self):
@@ -197,30 +260,35 @@ class FoxyServerGUI:
         if self.server_thread and self.server_thread.is_alive():
             self.server_thread.join(timeout=5)
 
-    def run_server_wrapper(self, args):
-        """Wrapper to start the server with stop support."""
+    def run_server_wrapper(self, args, stop_event, callback):
+        """Wrapper to start the server with stop support and callback."""
         try:
-            run_server(args, self.stop_event)
-        except Exception:
-            pass
+            run_server(args, stop_event, callback)  # Передаем все аргументы
+        except Exception as e:
+            logger.error(f"Error in server wrapper: {e}")
         finally:
             self.server_running = False
             self.start_stop_button.config(text="Start Server")
 
     def toggle_advanced(self):
-        """Expands/collapses additional parameters."""
-        if self.advanced_options_visible:
-            self.advanced_frame.pack_forget()
-        else:
-            self.advanced_frame.pack(pady=10)
-        self.advanced_options_visible = not self.advanced_options_visible
+            """Переключает режим между настройками и транскрипцией."""
+            if self.advanced_options_visible:
+                self.advanced_frame.pack_forget()
+                self.advanced_options_visible = False
+                self.transcription_visible = True
+                self.text_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+                self.advanced_button.config(text=" To Settings")
+            else:
+                self.text_frame.pack_forget()
+                self.transcription_visible = False
+                self.advanced_options_visible = True
+                self.advanced_frame.pack(pady=10)
+                self.advanced_button.config(text=" To Text")
 
     def on_close(self):
         """Handles window close event."""
         self.stop_server()
         self.root.destroy()
-
-
 
 #####################################
 def asr_factory(args, logfile=sys.stderr):
@@ -270,7 +338,7 @@ def asr_factory(args, logfile=sys.stderr):
     return asr, online
 
 ######################################################
-def run_server(args, stop_event=None):
+def run_server(args, stop_event=None, callback=None): 
     set_logging(args, logger)
 
     # Проверяем, что модель не пустая
@@ -313,14 +381,14 @@ def run_server(args, stop_event=None):
                 try:
                     conn, addr = s.accept()  # Неблокирующий accept()
                     logger.info('Connected to client on {}'.format(addr))
-                    snesory_object = FoxySensory(conn, mqtt_handler, tcp_echo=True)
+                    sensory_object = FoxySensory(conn, mqtt_handler, tcp_echo=True, callback=callback)  # Передаем callback
 
                     while get_port_status(args.port) == 1:
                         if stop_event and stop_event.is_set():  # Проверка на остановку
                             logger.info("Server stopping due to stop event.")
                             break
 
-                        proc = FoxyCore(snesory_object, online, args.min_chunk_size)
+                        proc = FoxyCore(sensory_object, online, args.min_chunk_size)
                         if not proc.process():
                             break
                     conn.close()
@@ -350,7 +418,7 @@ def main():
         root.mainloop()
     else:
         # Запуск сервера в консольном режиме
-        run_server(args)
+        run_server(args, callback=None)
 
 if __name__ == "__main__":
     main()

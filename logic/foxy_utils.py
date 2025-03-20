@@ -40,7 +40,7 @@ def set_logging(args, logger, other=""):
 def add_shared_args(parser):
     """Adds shared arguments for ASR configuration."""
     
-    parser.add_argument('--lang', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
+    parser.add_argument('--lan', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
     parser.add_argument('--task', type=str, default='transcribe', choices=["transcribe", "translate"], help="Task: transcription or translation.")
     parser.add_argument('--vad', action="store_true", default=False, help="Enable VAD (Voice Activity Detection).")
     parser.add_argument('--vac', action="store_true", default=False, help="Enable VAC (Voice Activity Controller).")
@@ -59,10 +59,10 @@ def add_shared_args(parser):
     parser.add_argument('--buffer-trimming-sec', type=float, default=15, help="Buffer trimming threshold in seconds.(for 'segment' trimming strategy) ")
     parser.add_argument('--min-chunk-size', type=float, default=1.0, help="Minimum audio segment size in seconds.")
 
-    parser.add_argument("--ll", "--log-level", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='DEBUG', help="Logging level.")
+    parser.add_argument("-l", "--log-level", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='DEBUG', help="Logging level.")
     parser.add_argument("--gui", action="store_true", help="Launch the server with a control GUI.")
     parser.add_argument("--host", type=str, default='0.0.0.0', help="Host address to bind the server to.")
-    parser.add_argument("--port_tcp", type=int, default=43007, help="TCP Port number for the server income audio stream.")
+    parser.add_argument("--port", type=int, default=43007, help="TCP Port number for the server income audio stream.")
 
 
 
@@ -74,7 +74,6 @@ def install_package(package_name: str):
     except ImportError:
         logger.info(f"Установка пакета {package_name}...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-
 
 
 ##########################

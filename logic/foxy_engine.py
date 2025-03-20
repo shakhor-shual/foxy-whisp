@@ -10,6 +10,7 @@ import select
 import io
 import soundfile #as sf
 import librosa
+import asyncio
 
 ##################################################################
 class FoxyCore:
@@ -166,7 +167,7 @@ class FoxyCore:
 
             send_error = not self.send_result(outcome, buff_tail)
 
-        logger.info("ASR process completed with send_error: {send_error}")
+        #logger.info("ASR process completed with send_error: {send_error}")
         final_text = self.asr_processor.finish()
         logger.info(f"Final transcription: {final_text}")
 
@@ -178,7 +179,7 @@ class FoxyCore:
 #######################################################################################################
 class FoxySensory:
 #######################
-    def __init__(self, conn, mqtt_handler, tcp_echo =True, timeout=1):
+    def __init__(self, conn, mqtt_handler, tcp_echo =True, timeout=1, callback=None):
         """
         :param conn: socket connection object
         :param timeout: timeout in seconds for data inactivity
@@ -190,6 +191,7 @@ class FoxySensory:
         self.timeout = timeout
         self.conn.setblocking(False)  # Set the socket to non-blocking mode
         self.max_cycles = int(timeout / CONNECTION_SELECT_DELAY)  # Calculate max cycles based on timeout
+        self.callback = callback
 
 #######################
     def send(self, line):
@@ -198,8 +200,12 @@ class FoxySensory:
             return
         
         payload= line.split("]", 1)[1].strip() if line.startswith("[") else None
-        if payload and self.mqtt_handler.connected:
-            self.mqtt_handler.publish_message(CONNECTION_TOPIC, payload)
+        if payload and self.callback: 
+            self.callback(payload + " ")
+        #if payload and self.mqtt_handler.connected:
+         #   self.mqtt_handler.publish_message(CONNECTION_TOPIC, payload + " ")
+
+
         if self.tcp_echo:
             send_one_line_tcp(self.conn, line)
         self.last_line = line
