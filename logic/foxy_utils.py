@@ -39,7 +39,13 @@ def set_logging(args, logger, other=""):
 ##########################
 def add_shared_args(parser):
     """Adds shared arguments for ASR configuration."""
-    
+
+
+    parser.add_argument("--listen", type=str, default="tcp", choices=["tcp", "audio_device"],
+                       help="Source of audio input: 'tcp' (default) or 'audio_device'.")
+    parser.add_argument("--audio-device", type=int, default=None,
+                       help="ID of the audio input device (if --listen=audio_device).")
+
     parser.add_argument('--lan', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
     parser.add_argument('--task', type=str, default='transcribe', choices=["transcribe", "translate"], help="Task: transcription or translation.")
     parser.add_argument('--vad', action="store_true", default=False, help="Enable VAD (Voice Activity Detection).")
