@@ -1072,64 +1072,6 @@ def asr_factory(args, logfile=sys.stderr):
     return asr, online
 
 
-# ###########################
-# # Основной цикл сервера
-# def main():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--host", type=str, default='0.0.0.0')
-#     parser.add_argument("--port", type=int, default=43007)
-#     parser.add_argument("--warmup-file", type=str, dest="warmup_file",
-#                         help="Path to a speech audio file to warm up Whisper.")
-#     add_shared_args(parser)
-#     args = parser.parse_args()
-
-#     set_logging(args, logger)
-
-#     asr, online = asr_factory(args)
-#     if args.warmup_file and os.path.isfile(args.warmup_file):
-#         a = load_audio_chunk(args.warmup_file, 0, 1)
-#         asr.transcribe(a)
-#         logger.info("Whisper is warmed up.")
-#     else:
-#         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
-
-
-#     mqtt_handler = MQTTHandler()
-#     mqtt_handler.connect_to_external_broker()
-
-#     if not mqtt_handler.connected:
-#         mqtt_handler.start_embedded_broker()
-
-#     if mqtt_handler.connected:
-#         mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
-#     else:
-#         logging.error("MQTT client is not connected. Unable to publish message.")
-
-#     # Server loop
-#     if get_port_status(args.port) == 0:
-#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#             s.bind((args.host, args.port))
-#             s.listen(1)
-#             logger.info('Listening on' + str((args.host, args.port)))
-            
-#             while get_port_status(args.port) > 0:
-#                 conn, addr = s.accept()
-#                 logger.info('Connected to client on {}'.format(addr))
-#                 connection = Connection(conn, mqtt_handler, tcp_echo =True)
-
-#                 while get_port_status(args.port) == 1:
-#                     proc = ServerProcessor(connection,  online, args.min_chunk_size)
-#                     if not proc.process():
-#                         break
-#                 conn.close()
-#                 logger.info('Connection to client closed')
-#         logger.info('Connection closed, terminating.')
-#     else:
-#         logger.info(f'port {args.port} already IN USE, terminating.')
-
-# if __name__ == "__main__":
-#     main()
-
 # Модифицируем функцию main для поддержки GUI
 def main():
     parser = argparse.ArgumentParser()
