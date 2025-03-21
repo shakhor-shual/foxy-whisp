@@ -1,38 +1,15 @@
- #!/usr/bin/env python3
-from  logic.foxy_config import *
-from logic.foxy_utils import load_audio_chunk,  add_shared_args,  set_logging, logger, get_port_status, create_tokenizer
-
-from logic.asr_backends import FasterWhisperASR, OpenaiApiASR, WhisperTimestampedASR
-from logic.asr_processors import OnlineASRProcessor, VACOnlineASRProcessor
-from logic.mqtt_handler import MQTTHandler
-# from logic.foxy_engine import FoxyCore, FoxySensory
+#!/usr/bin/env python3
+from logic.foxy_config import *
+from logic.foxy_utils import load_audio_chunk, add_shared_args, set_logging, logger, get_port_status, create_tokenizer
 from logic.local_audio_input import LocalAudioInput
+from logic.foxy_manager import FoxyManager
 
-import sys
 import argparse
-import os
-import logging
-import time
-import socket
-
-import tkinter as tk
-from tkinter import ttk
-import threading
-import tkinter as tk
-from tkinter import ttk
-import threading
-
-import tkinter as tk
-from tkinter import ttk
-import threading
-
-import tkinter as tk
-from tkinter import ttk
-import threading
-
 import tkinter as tk
 from tkinter import ttk, filedialog
 import threading
+
+
 
 class FoxyServerGUI:
     def __init__(self, root, parser, args):
@@ -57,7 +34,7 @@ class FoxyServerGUI:
         self.create_buttons()
         self.create_text_area()
         self.create_advanced_frame()
-        self.create_audio_source_controls()  # Добавляем элементы управления источником аудио
+        self.create_audio_source_controls()
         self.create_apply_button()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -68,11 +45,9 @@ class FoxyServerGUI:
 
     def create_buttons(self):
         """Создание кнопок управления."""
-        # Кнопка запуска/остановки сервера
         self.start_stop_button = ttk.Button(self.main_frame, text="Start Server", command=self.toggle_server)
         self.start_stop_button.pack(fill=tk.X, pady=5)
 
-        # Кнопка переключения в расширенные настройки
         self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.toggle_advanced)
         self.advanced_button.pack(fill=tk.X, pady=5)
 
@@ -81,31 +56,24 @@ class FoxyServerGUI:
         self.text_frame = ttk.Frame(self.main_frame)
         self.text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        # Фрейм для кнопок управления
         self.button_frame = ttk.Frame(self.text_frame)
         self.button_frame.pack(fill=tk.X, pady=5)
 
-        # Кнопка очистки текста
         self.clear_btn = tk.Button(self.button_frame, text="✗", font=("Monospace", 12, "bold"), command=self.clear_text)
         self.clear_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        # Кнопка сохранения
         self.save_btn = tk.Button(self.button_frame, text="▽", font=("Monospace", 12, "bold"), command=self.save_text)
         self.save_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        # Кнопка запроса помощи
         self.ask_btn = tk.Button(self.button_frame, text="?", font=("Monospace", 12, "bold"), command=self.show_help)
         self.ask_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        # Кнопка отключения звука
         self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.toggle_mute)
         self.mute_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        # Текстовое поле
         self.text_area = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
         self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Полоса прокрутки
         self.scrollbar = ttk.Scrollbar(self.text_frame, orient=tk.VERTICAL, command=self.text_area.yview)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.text_area.config(yscrollcommand=self.scrollbar.set)
@@ -120,28 +88,22 @@ class FoxyServerGUI:
         audio_frame = ttk.Frame(self.advanced_frame)
         audio_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        # Выбор источника аудио
         ttk.Label(audio_frame, text="Audio Source:").pack(side=tk.LEFT)
         self.source_var = tk.StringVar(value=self.args.listen)
         self.source_combobox = ttk.Combobox(audio_frame, textvariable=self.source_var, values=["tcp", "audio_device"])
         self.source_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.source_combobox.bind("<<ComboboxSelected>>", self.on_audio_source_change)
 
-        # Фрейм для выбора аудиоустройства (если источник — audio_device)
         self.device_frame = ttk.Frame(self.advanced_frame)
-
-        # Выбор аудиоустройства
         ttk.Label(self.device_frame, text="Audio Device:").pack(side=tk.LEFT)
         self.device_var = tk.StringVar()
         self.device_combobox = ttk.Combobox(self.device_frame, textvariable=self.device_var)
         self.device_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.device_combobox.bind("<<ComboboxSelected>>", self.on_audio_device_change)
 
-        # Кнопка обновления списка устройств
         refresh_button = ttk.Button(self.device_frame, text="Refresh", command=self.update_audio_devices)
         refresh_button.pack(side=tk.RIGHT, padx=5)
 
-        # Обновляем список устройств при запуске
         self.update_audio_devices()
         self.update_audio_device_visibility()
 
@@ -164,7 +126,6 @@ class FoxyServerGUI:
         input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices if d["max_input_channels"] > 0]
         self.device_combobox["values"] = input_devices
 
-        # Устанавливаем устройство по умолчанию, если не выбрано другое
         if not self.device_var.get() and input_devices:
             default_device = LocalAudioInput.get_default_input_device()
             self.device_var.set(f"{devices[default_device]['name']} (ID: {default_device})")
@@ -174,7 +135,6 @@ class FoxyServerGUI:
         """Обработка изменения выбранного аудиоустройства."""
         selected_device = self.device_var.get()
         if selected_device:
-            # Извлекаем ID устройства из строки (формат: "Имя устройства (ID: X)")
             device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
             self.args.audio_device = device_id
             self.apply_changes()
@@ -254,19 +214,15 @@ class FoxyServerGUI:
             logger.warning("Cannot apply changes while server is running.")
             return
 
-        # Обновляем параметры источника аудио
         self.args.listen = self.source_var.get()
         if self.args.listen == "audio_device":
             selected_device = self.device_var.get()
             if selected_device:
-                # Извлекаем ID устройства из строки (формат: "Имя устройства (ID: X)")
                 device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
                 self.args.audio_device = device_id
             else:
-                # Если устройство не выбрано, используем устройство по умолчанию
                 self.args.audio_device = LocalAudioInput.get_default_input_device()
 
-        # Применяем остальные изменения
         for param, (widget, var) in self.widgets.items():
             value = var.get()
             if isinstance(value, str) and value.strip() == "":
@@ -296,17 +252,13 @@ class FoxyServerGUI:
     def toggle_server(self):
         """Переключение состояния сервера."""
         if self.server_running:
-            # Останавливаем сервер
             self.stop_server()
-            # Проверяем, действительно ли сервер остановился
             if not self.server_running:
                 self.start_stop_button.config(text="Start Server")
             else:
                 logger.error("Failed to stop the server.")
         else:
-            # Запускаем сервер
             self.start_server()
-            # Проверяем, действительно ли сервер запустился
             if self.server_running:
                 self.start_stop_button.config(text="Stop Server")
             else:
@@ -339,7 +291,7 @@ class FoxyServerGUI:
         self.stop_event.set()
 
         if self.server_thread and self.server_thread.is_alive():
-            self.server_thread.join(timeout=5)  # Ждем завершения потока
+            self.server_thread.join(timeout=5)
             if not self.server_thread.is_alive():
                 self.server_running = False
                 logger.info("Server stopped successfully.")
@@ -352,7 +304,8 @@ class FoxyServerGUI:
     def run_server_wrapper(self, args, stop_event, callback):
         """Обертка для запуска сервера."""
         try:
-            run_server(args, stop_event, callback)
+            server_manager = FoxyManager(args, stop_event, callback)
+            server_manager.run()
         except Exception as e:
             logger.error(f"Error in server wrapper: {e}")
         finally:
@@ -400,219 +353,14 @@ class FoxyServerGUI:
 
     def show_help(self):
         """Заглушка для кнопки помощи."""
-        print("Help button clicked")  # Можно заменить на реальную логику
+        print("Help button clicked")
 
     def toggle_mute(self):
         """Заглушка для кнопки отключения звука."""
-        print("Mute button clicked")  # Можно заменить на реальную логику
+        print("Mute button clicked")
 
-#####################################
-def asr_factory(args, logfile=sys.stderr):
-    """ Creates and configures an ASR and ASR Online instance based on the specified backend and arguments. """
-    backend = args.backend
-    if backend == "openai-api":
-        logger.debug("Using OpenAI API.")
-        asr = OpenaiApiASR(lan=args.lan)
-    else:
-        if backend == "faster-whisper":
-            asr_cls = FasterWhisperASR
-        else:
-            asr_cls = WhisperTimestampedASR
 
-        # Only for FasterWhisperASR and WhisperTimestampedASR
-        size = args.model
-        t = time.time()
-        logger.info(f"Loading Whisper {size} model for {args.lan}...")
-        asr = asr_cls(modelsize=size, lan=args.lan, cache_dir=args.model_cache_dir, model_dir=args.model_dir)
-        e = time.time()
-        logger.info(f"done. It took {round(e-t,2)} seconds.")
 
-    # Apply common configurations
-    if getattr(args, 'vad', False):  # Checks if VAD argument is present and True
-        logger.info("Setting VAD filter")
-        asr.use_vad()
-
-    language = args.lan
-    if args.task == "translate":
-        asr.set_translate_task()
-        tgt_language = "en"  # Whisper translates into English
-    else:
-        tgt_language = language  # Whisper transcribes in this language
-
-    # Create the tokenizer
-    if args.buffer_trimming == "sentence":
-        tokenizer = create_tokenizer(tgt_language)
-    else:
-        tokenizer = None
-
-    # Create the OnlineASRProcessor
-    if args.vac:
-        online = VACOnlineASRProcessor(args.min_chunk_size, asr,tokenizer,logfile=logfile,buffer_trimming=(args.buffer_trimming, args.buffer_trimming_sec))
-    else:
-        online = OnlineASRProcessor(asr,tokenizer,logfile=logfile,buffer_trimming=(args.buffer_trimming, args.buffer_trimming_sec))
-
-    return asr, online
-
-########################################
-from logic.foxy_engine import FoxyProcessor  # Импорт нового класса
-
-def run_server(args, stop_event=None, callback=None):
-    set_logging(args, logger)
-
-    if not args.model:
-        logger.error("Модель не может быть пустой. Установлено значение по умолчанию: large-v3-turbo.")
-        args.model = "large-v3-turbo"
-
-    asr, online = asr_factory(args)
-    if args.warmup_file and os.path.isfile(args.warmup_file):
-        a = load_audio_chunk(args.warmup_file, 0, 1)
-        asr.transcribe(a)
-        logger.info("Whisper is warmed up.")
-    else:
-        logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
-
-    mqtt_handler = MQTTHandler()
-    mqtt_handler.connect_to_external_broker()
-
-    if not mqtt_handler.connected:
-        mqtt_handler.start_embedded_broker()
-
-    if mqtt_handler.connected:
-        mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
-    else:
-        logging.error("MQTT client is not connected. Unable to publish message.")
-
-    # Локальный аудиоввод
-    if args.listen == "audio_device":
-        if args.audio_device is None:
-            args.audio_device = LocalAudioInput.get_default_input_device()
-        proc = FoxyProcessor(
-            asr_processor=online,
-            use_local_audio=True,
-            audio_device=args.audio_device,
-            callback=callback
-        )
-        proc.local_audio_input.start()
-
-    # TCP-листенер (если выбран источник TCP)
-    if args.listen == "tcp":
-        if get_port_status(args.port) == 0:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((args.host, args.port))
-                s.listen(1)
-                s.settimeout(1)
-                logger.info('Listening on' + str((args.host, args.port)))
-                
-                while get_port_status(args.port) > 0:
-                    if stop_event and stop_event.is_set():
-                        logger.info("Server stopping due to stop event.")
-                        break
-
-                    try:
-                        conn, addr = s.accept()
-                        logger.info('Connected to client on {}'.format(addr))
-                        proc = FoxyProcessor(
-                            conn=conn,
-                            mqtt_handler=mqtt_handler,
-                            asr_processor=online,
-                            minimal_chunk=args.min_chunk_size,
-                            use_local_audio=False,
-                            callback=callback
-                        )
-
-                        while get_port_status(args.port) == 1:
-                            if stop_event and stop_event.is_set():
-                                logger.info("Server stopping due to stop event.")
-                                break
-
-                            if not proc.process():
-                                break
-                        conn.close()
-                        logger.info('Connection to client closed')
-                    except socket.timeout:
-                        continue
-                    except Exception as e:
-                        logger.error(f"Error in server loop: {e}")
-                        break
-
-            logger.info('Connection closed, terminating.')
-        else:
-            logger.info(f'port {args.port} already IN USE, terminating.')##
-
-# def run_server(args, stop_event=None, callback=None):
-#     set_logging(args, logger)
-
-#     if not args.model:
-#         logger.error("Модель не может быть пустой. Установлено значение по умолчанию: large-v3-turbo.")
-#         args.model = "large-v3-turbo"
-
-#     asr, online = asr_factory(args)
-#     if args.warmup_file and os.path.isfile(args.warmup_file):
-#         a = load_audio_chunk(args.warmup_file, 0, 1)
-#         asr.transcribe(a)
-#         logger.info("Whisper is warmed up.")
-#     else:
-#         logger.warning("Whisper is not warmed up. The first chunk processing may take longer.")
-
-#     mqtt_handler = MQTTHandler()
-#     mqtt_handler.connect_to_external_broker()
-
-#     if not mqtt_handler.connected:
-#         mqtt_handler.start_embedded_broker()
-
-#     if mqtt_handler.connected:
-#         mqtt_handler.publish_message(CONNECTION_TOPIC, "<foxy:started>")
-#     else:
-#         logging.error("MQTT client is not connected. Unable to publish message.")
-
-#     # Локальный аудиоввод
-#     if args.listen == "audio_device":
-#         if args.audio_device is None:
-#             args.audio_device = LocalAudioInput.get_default_input_device()
-#         local_audio_input = LocalAudioInput(device=args.audio_device)
-#         local_audio_input.set_audio_callback(lambda chunk: online.insert_audio_chunk(chunk))
-#         local_audio_input.start()
-
-#     # TCP-листенер (если выбран источник TCP)
-#     if args.listen == "tcp":
-#         if get_port_status(args.port) == 0:
-#             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#                 s.bind((args.host, args.port))
-#                 s.listen(1)
-#                 s.settimeout(1)
-#                 logger.info('Listening on' + str((args.host, args.port)))
-                
-#                 while get_port_status(args.port) > 0:
-#                     if stop_event and stop_event.is_set():
-#                         logger.info("Server stopping due to stop event.")
-#                         break
-
-#                     try:
-#                         conn, addr = s.accept()
-#                         logger.info('Connected to client on {}'.format(addr))
-#                         sensory_object = FoxySensory(conn, mqtt_handler, tcp_echo=True, callback=callback)
-
-#                         while get_port_status(args.port) == 1:
-#                             if stop_event and stop_event.is_set():
-#                                 logger.info("Server stopping due to stop event.")
-#                                 break
-
-#                             proc = FoxyCore(sensory_object, online, args.min_chunk_size, use_local_audio=False)
-#                             if not proc.process():
-#                                 break
-#                         conn.close()
-#                         logger.info('Connection to client closed')
-#                     except socket.timeout:
-#                         continue
-#                     except Exception as e:
-#                         logger.error(f"Error in server loop: {e}")
-#                         break
-
-#             logger.info('Connection closed, terminating.')
-#         else:
-#             logger.info(f'port {args.port} already IN USE, terminating.')
-
-# ########################################################
 def main():
     parser = argparse.ArgumentParser()
     add_shared_args(parser)  # Добавляем общие аргументы
@@ -625,7 +373,10 @@ def main():
         root.mainloop()
     else:
         # Запуск сервера в консольном режиме
-        run_server(args, callback=None)
+        server_manager = FoxyManager(args, stop_event=None, callback=None)
+        server_manager.run()
 
 if __name__ == "__main__":
     main()
+
+    

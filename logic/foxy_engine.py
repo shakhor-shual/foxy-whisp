@@ -6,19 +6,6 @@ from logic.asr_processors import OnlineASRProcessor, VACOnlineASRProcessor
 from logic.mqtt_handler import MQTTHandler
 from logic.local_audio_input import LocalAudioInput
 
-import numpy as np
-import select
-import io
-import soundfile #as sf
-import librosa
-import asyncio
-
-import numpy as np
-import soundfile
-import librosa
-import io
-import time
-
 
 import numpy as np
 import soundfile
