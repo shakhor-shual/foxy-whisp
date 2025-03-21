@@ -123,6 +123,21 @@ class FoxyManager:
         else:
             logging.error("MQTT client is not connected. Unable to publish message.")
 
+    # def start_local_audio(self):
+    #     """Запуск локального аудиоввода."""
+    #     if self.args.audio_device is None:
+    #         self.args.audio_device = LocalAudioInput.get_default_input_device()
+        
+    #     local_audio_source = LocalAudioSource(self.args.audio_device, self.callback)
+    #     self.proc = FoxyProcessor(
+    #         audio_source=local_audio_source,
+    #         mqtt_handler=self.mqtt_handler,
+    #         asr_processor=self.online,
+    #         minimal_chunk=self.args.min_chunk_size,
+    #         callback=self.callback
+    #     )
+    #     self.proc.local_audio_input.start()
+
     def start_local_audio(self):
         """Запуск локального аудиоввода."""
         if self.args.audio_device is None:
@@ -136,7 +151,7 @@ class FoxyManager:
             minimal_chunk=self.args.min_chunk_size,
             callback=self.callback
         )
-        self.proc.local_audio_input.start()
+        local_audio_source.local_audio_input.start()  # Запуск через audio_source
 
     def start_tcp_server(self):
         """Запуск TCP-сервера."""

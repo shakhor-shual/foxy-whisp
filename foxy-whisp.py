@@ -32,6 +32,7 @@ class FoxyServerGUI:
 
         self.create_main_frame()
         self.create_buttons()
+        self.create_audio_level_indicator()  # Новый метод
         self.create_text_area()
         self.create_advanced_frame()
         self.create_audio_source_controls()
@@ -50,6 +51,22 @@ class FoxyServerGUI:
 
         self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.toggle_advanced)
         self.advanced_button.pack(fill=tk.X, pady=5)
+
+    def create_audio_level_indicator(self):
+        """Создание индикатора уровня аудиосигнала."""
+        self.audio_level_frame = ttk.Frame(self.main_frame)
+        self.audio_level_frame.pack(fill=tk.X, pady=5)
+
+        self.audio_level_label = ttk.Label(self.audio_level_frame, text="Audio Level:")
+        self.audio_level_label.pack(side=tk.LEFT)
+
+        self.audio_level_bar = ttk.Progressbar(self.audio_level_frame, orient=tk.HORIZONTAL, length=150, mode="determinate")
+        self.audio_level_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+    def update_audio_level(self, level):
+        """Обновление индикатора уровня аудиосигнала."""
+        self.audio_level_bar["value"] = level
+        self.audio_level_bar.update()
 
     def create_text_area(self):
         """Создание текстового поля и кнопок управления."""
@@ -331,12 +348,22 @@ class FoxyServerGUI:
             self.stop_server()
         self.root.destroy()
 
+    # def append_text(self, text):
+    #     """Добавление текста в текстовое поле."""
+    #     self.text_area.config(state=tk.NORMAL)
+    #     self.text_area.insert(tk.END, text)
+    #     self.text_area.see(tk.END)
+    #     self.text_area.config(state=tk.DISABLED)
+
     def append_text(self, text):
         """Добавление текста в текстовое поле."""
-        self.text_area.config(state=tk.NORMAL)
-        self.text_area.insert(tk.END, text)
-        self.text_area.see(tk.END)
-        self.text_area.config(state=tk.DISABLED)
+        if isinstance(text, int):  # Если передается уровень сигнала
+            self.update_audio_level(text)
+        else:  # Если передается текст
+            self.text_area.config(state=tk.NORMAL)
+            self.text_area.insert(tk.END, text)
+            self.text_area.see(tk.END)
+            self.text_area.config(state=tk.DISABLED)
 
     def clear_text(self):
         """Очистка текстового поля."""
