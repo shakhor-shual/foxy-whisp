@@ -153,6 +153,20 @@ class FoxyManager:
         )
         local_audio_source.local_audio_input.start()  # Запуск через audio_source
 
+        while True:
+            if self.stop_event and self.stop_event.is_set():
+                logger.info("Server stopping due to stop event.")
+                break
+            try:
+                if not self.proc.process():
+                    break
+            except Exception as e:
+                logger.error(f"Error processing audio: {e}")
+                break
+        local_audio_source.local_audio_input.stop()
+
+
+
     def start_tcp_server(self):
         """Запуск TCP-сервера."""
         if get_port_status(self.args.port) == 0:

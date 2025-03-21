@@ -58,9 +58,7 @@ class LocalAudioSource(AudioSource):
     def receive_audio(self):
         """Возвращает аудиоданные из буфера."""
         if len(self.audio_buffer) > 0:
-            print(f"YYYYYYYYYYYYYYY{self.audio_buffer}YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
             return self.audio_buffer.popleft()  # Возвращаем данные из буфера
-        print(f"ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
         return None  # Если буфер пуст
 
 class FoxyProcessor:
@@ -74,7 +72,7 @@ class FoxyProcessor:
         self.tcp_echo = tcp_echo
         self.gui_callback = callback
         self.void_counter = 0
-        self.max_void = 5
+        self.max_void = 500
         self.is_first = True
         self.audio_buffer = deque(maxlen=10240)
         self.last_end = None
@@ -144,7 +142,7 @@ class FoxyProcessor:
             self.gui_callback(normalized_level)
 
 
-    def fetch_audio_chunk(self):
+    def receive_audio_chunk(self):
         """Получение аудиочанка и отслеживание простоев."""
         out = []
         min_limit = self.minimal_chunk * SAMPLING_RATE
@@ -152,7 +150,8 @@ class FoxyProcessor:
         while sum(len(x) for x in out) < min_limit:
             raw_bytes = self.audio_source.receive_audio()
             print(f"===VOID_COUNT========={self.void_counter}============")
-            if not raw_bytes:
+            #if not raw_bytes:
+            if raw_bytes is None or len(raw_bytes) == 0:
                 # Увеличиваем счетчик циклов без данных
                 self.void_counter += 1
 
@@ -178,7 +177,7 @@ class FoxyProcessor:
     def handle_audio_chunk(self):
         """Обработка аудиочанка и обновление индикатора."""
 
-        audio_chunk = self.fetch_audio_chunk()
+        audio_chunk = self.receive_audio_chunk()
         self.show_audio_level(audio_chunk)
         
         if audio_chunk is None or len(audio_chunk) == 0:
