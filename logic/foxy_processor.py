@@ -73,7 +73,7 @@ class FoxyProcessor:
         self.tcp_echo = tcp_echo
         self.gui_callback = callback
         self.void_counter = 0
-        self.max_void = 500
+        self.max_void = 50000
         self.is_first = True
         self.audio_buffer = deque(maxlen=10240)
         self.last_end = None
@@ -148,7 +148,7 @@ class FoxyProcessor:
         min_limit = self.minimal_chunk * SAMPLING_RATE
         while sum(len(x) for x in out) < min_limit:
             raw_bytes = self.audio_source.receive_audio()
-            print(f"===VOID_COUNT========={self.void_counter}============")
+            
             #if not raw_bytes:
             if raw_bytes is None or len(raw_bytes) == 0:
                 # Увеличиваем счетчик циклов без данных
@@ -157,6 +157,7 @@ class FoxyProcessor:
                 # Сбрасываем индикатор, если счетчик превысил порог
                 if self.void_counter > self.max_void // 2:  # Порог — половина от max_void
                     if self.gui_callback:
+                        print(f"===VOID_COUNT========={self.void_counter}============")
                         self.gui_callback(0)  # Сброс индикатора в ноль
                 break
             else:

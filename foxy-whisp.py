@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#foxy-whisp.py
 from logic.foxy_config import *
 from logic.foxy_utils import logger
 from logic.local_audio_input import LocalAudioInput
@@ -54,35 +54,119 @@ class FoxyServerGUI:
         self.advanced_options_visible = False
         self.widgets = {}
         self.audio_input = None  # Объект LocalAudioInput
+        self.recording = False  # Флаг для отслеживания состояния записи
 
         self.setup_gui()
 
     def setup_gui(self):
         """Настройка основного интерфейса."""
-        self.root.geometry("300x700")
+        self.root.geometry("300x900")
         self.root.title("Foxy-Whisp")
 
         self.create_main_frame()
-        self.create_buttons()
-        self.create_audio_level_indicator()  # Новый метод
+        self.create_control_buttons()  # Новый метод для создания кнопок управления
+        self.create_audio_level_indicator()
         self.create_text_area()
         self.create_advanced_frame()
-        self.create_audio_source_controls()
         self.create_apply_button()
         self.root.protocol("WM_DELETE_WINDOW", self.gui_on_close)
+        self.update_controls_activity()  # Обновляем активность элементов
 
     def create_main_frame(self):
         """Создание основного контейнера."""
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def create_buttons(self):
-        """Создание кнопок управления."""
-        self.start_stop_button = ttk.Button(self.main_frame, text="Start Server", command=self.gui_toggle_server)
-        self.start_stop_button.pack(fill=tk.X, pady=5)
+    def create_control_buttons(self):
+        """Создание кнопок управления и элементов выбора аудиоисточника."""
+        self.control_frame = ttk.Frame(self.main_frame)
+        self.control_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.gui_toggle_advanced)
-        self.advanced_button.pack(fill=tk.X, pady=5)
+        # Кнопка запуска/остановки сервера
+        self.start_stop_button = ttk.Button(self.control_frame, text="Start Server", command=self.gui_toggle_server)
+        self.start_stop_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+
+        # Кнопка переключения источника аудио (TCP/Audio Device)
+        self.source_button = ttk.Button(self.control_frame, text="TCP", command=self.gui_toggle_audio_source)
+        self.source_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+
+        # Кнопка включения/выключения записи аудио
+        self.record_button = ttk.Button(self.control_frame, text="Start Recording", command=self.gui_toggle_recording)
+        self.record_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+
+        # Комбобокс выбора аудиоустройства
+        self.device_combobox = ttk.Combobox(self.control_frame, state="readonly")
+        self.device_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5, pady=5)
+        self.device_combobox.bind("<<ComboboxSelected>>", self.on_audio_device_change)
+
+        # Обновляем список устройств
+        self.update_audio_devices()
+
+        # Кнопка перехода к расширенным настройкам
+        self.advanced_button = ttk.Button(self.control_frame, text="To Advanced", command=self.gui_toggle_advanced)
+        self.advanced_button.pack(side=tk.RIGHT, fill=tk.X, padx=5, pady=5)
+
+    def update_audio_devices(self):
+        """Обновляет список доступных аудиоустройств."""
+        devices = LocalAudioInput.list_devices()
+        input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices if d["max_input_channels"] > 0]
+        self.device_combobox["values"] = input_devices
+
+        if input_devices:
+            default_device = LocalAudioInput.get_default_input_device()
+            self.device_combobox.set(f"{devices[default_device]['name']} (ID: {default_device})")
+            self.args.audio_device = default_device
+
+    def gui_toggle_audio_source(self):
+        """Переключение между TCP и Audio Device."""
+        if self.args.listen == "tcp":
+            self.args.listen = "audio_device"
+            self.source_button.config(text="Audio Device")
+            self.update_audio_devices()  # Обновляем список устройств
+        else:
+            self.args.listen = "tcp"
+            self.source_button.config(text="TCP")
+        
+        # Обновить активность элементов
+        self.update_controls_activity()
+        
+        # Применить изменения
+        self.gui_apply_changes()
+
+    def update_controls_activity(self):
+        """Обновление активности элементов в зависимости от выбранного источника аудио."""
+        if self.args.listen == "tcp":
+            # В режиме TCP отключаем кнопку записи и комбобокс выбора устройства
+            self.record_button.config(state=tk.DISABLED)
+            self.device_combobox.config(state=tk.DISABLED)
+        else:
+            # В режиме Audio Device включаем кнопку записи и комбобокс выбора устройства
+            self.record_button.config(state=tk.NORMAL)
+            self.device_combobox.config(state="readonly")
+
+    # ... (остальные методы остаются без изменений)
+
+
+    def on_audio_source_change(self, event=None):
+        """Обработка изменения выбранного источника аудио."""
+        self.args.listen = self.source_var.get()
+        self.update_audio_device_visibility()
+        self.gui_apply_changes()
+
+    def update_audio_device_visibility(self):
+        """Обновляет видимость элементов управления аудиоустройством."""
+        if self.args.listen == "audio_device":
+            self.device_frame.pack(fill=tk.X, padx=5, pady=5)
+        else:
+            self.device_frame.pack_forget()
+
+    def on_audio_device_change(self, event=None):
+        """Обработка изменения выбранного аудиоустройства."""
+        selected_device = self.device_var.get()
+        if selected_device:
+            device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
+            self.args.audio_device = device_id
+            self.gui_apply_changes()
 
     def create_audio_level_indicator(self):
         """Создание индикатора уровня аудиосигнала."""
@@ -117,7 +201,7 @@ class FoxyServerGUI:
         self.ask_btn = tk.Button(self.button_frame, text="?", font=("Monospace", 12, "bold"), command=self.gui_show_help)
         self.ask_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.gui_toggle_mute)
+        self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.gui_toggle_recording)
         self.mute_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
         self.text_area = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
@@ -132,72 +216,12 @@ class FoxyServerGUI:
         self.advanced_frame = ttk.Frame(self.main_frame)
         self.add_parameter_controls()
 
-    def create_audio_source_controls(self):
-        """Создание элементов управления для выбора источника аудио."""
-        audio_frame = ttk.Frame(self.advanced_frame)
-        audio_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(audio_frame, text="Audio Source:").pack(side=tk.LEFT)
-        self.source_var = tk.StringVar(value=self.args.listen)
-        self.source_combobox = ttk.Combobox(audio_frame, textvariable=self.source_var, values=["tcp", "audio_device"])
-        self.source_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.source_combobox.bind("<<ComboboxSelected>>", self.on_audio_source_change)
-
-        self.device_frame = ttk.Frame(self.advanced_frame)
-        ttk.Label(self.device_frame, text="Audio Device:").pack(side=tk.LEFT)
-        self.device_var = tk.StringVar()
-        self.device_combobox = ttk.Combobox(self.device_frame, textvariable=self.device_var)
-        self.device_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.device_combobox.bind("<<ComboboxSelected>>", self.on_audio_device_change)
-
-        refresh_button = ttk.Button(self.device_frame, text="Refresh", command=self.update_audio_devices)
-        refresh_button.pack(side=tk.RIGHT, padx=5)
-
-        self.update_audio_devices()
-        self.update_audio_device_visibility()
-
-    def on_audio_source_change(self, event=None):
-        """Обработка изменения выбранного источника аудио."""
-        self.args.listen = self.source_var.get()
-        self.update_audio_device_visibility()
-        self.gui_apply_changes()
-
-    def update_audio_device_visibility(self):
-        """Обновляет видимость элементов управления аудиоустройством."""
-        if self.args.listen == "audio_device":
-            self.device_frame.pack(fill=tk.X, padx=5, pady=5)
-        else:
-            self.device_frame.pack_forget()
-
-    def update_audio_devices(self):
-        """Обновляет список доступных аудиоустройств."""
-        devices = LocalAudioInput.list_devices()
-        input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices if d["max_input_channels"] > 0]
-        self.device_combobox["values"] = input_devices
-
-        if not self.device_var.get() and input_devices:
-            default_device = LocalAudioInput.get_default_input_device()
-            self.device_var.set(f"{devices[default_device]['name']} (ID: {default_device})")
-            self.args.audio_device = default_device
-
-    def on_audio_device_change(self, event=None):
-        """Обработка изменения выбранного аудиоустройства."""
-        selected_device = self.device_var.get()
-        if selected_device:
-            device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
-            self.args.audio_device = device_id
-            self.gui_apply_changes()
-
-    def create_apply_button(self):
-        """Создание кнопки 'Apply'."""
-        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.gui_apply_changes, state=tk.DISABLED)
-        self.apply_button.pack(fill=tk.X, pady=5)
-
     def add_parameter_controls(self):
         """Добавление элементов управления для параметров."""
         for action in self.parser._actions:
-            if action.dest == "help":
+            if action.dest in ("help", "listen"):
                 continue
+
 
             frame = ttk.Frame(self.advanced_frame)
             frame.pack(fill=tk.X, padx=5, pady=5)
@@ -257,20 +281,19 @@ class FoxyServerGUI:
         """Обработка изменений параметров."""
         self.apply_button.config(state=tk.NORMAL)
 
+    def create_apply_button(self):
+        """Создание кнопки 'Apply'."""
+        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.gui_apply_changes, state=tk.DISABLED)
+        self.apply_button.pack(fill=tk.X, pady=5)
+
     def gui_apply_changes(self):
         """Применение изменений параметров."""
         if self.server_running:
             logger.warning("Cannot apply changes while server is running.")
             return
 
-        self.args.listen = self.source_var.get()
-        if self.args.listen == "audio_device":
-            selected_device = self.device_var.get()
-            if selected_device:
-                device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
-                self.args.audio_device = device_id
-            else:
-                self.args.audio_device = LocalAudioInput.get_default_input_device()
+        # Убедимся, что параметр listen уже обновлен в gui_toggle_audio_source
+        # self.args.listen уже содержит актуальное значение
 
         for param, (widget, var) in self.widgets.items():
             value = var.get()
@@ -297,6 +320,7 @@ class FoxyServerGUI:
             self.apply_button.config(state=tk.DISABLED)
 
         logger.info("Changes applied successfully.")
+
 
     def gui_toggle_server(self):
         """Переключение состояния сервера."""
@@ -380,13 +404,13 @@ class FoxyServerGUI:
             self.gui_stop_server()
         self.root.destroy()
 
-    def append_text(self, text):
+    def append_text(self, data):
         """Добавление текста в текстовое поле."""
-        if isinstance(text, int):  # Если передается уровень сигнала
-            self.update_audio_level(text)
+        if isinstance(data, int):  # Если передается уровень сигнала
+            self.update_audio_level(data)
         else:  # Если передается текст
             self.text_area.config(state=tk.NORMAL)
-            self.text_area.insert(tk.END, text)
+            self.text_area.insert(tk.END, data)
             self.text_area.see(tk.END)
             self.text_area.config(state=tk.DISABLED)
 
@@ -407,10 +431,20 @@ class FoxyServerGUI:
         """Заглушка для кнопки помощи."""
         print("Help button clicked")
 
-    def gui_toggle_mute(self):
-        """Заглушка для кнопки отключения звука."""
-        print("Mute button clicked")
-
+    def gui_toggle_recording(self):
+        """Переключение состояния записи аудио."""
+        if self.recording:
+            self.recording = False
+            self.record_button.config(text="Start Recording")
+            # Остановить запись аудио
+            if self.audio_input:
+                self.audio_input.stop()
+        else:
+            self.recording = True
+            self.record_button.config(text="Stop Recording")
+            # Начать запись аудио
+            if self.audio_input:
+                self.audio_input.start()
 
 def main():
     parser = argparse.ArgumentParser()

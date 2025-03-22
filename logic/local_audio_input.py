@@ -1,33 +1,57 @@
-from logic.foxy_config import *
-from logic.foxy_utils import logger, send_one_line_tcp, receive_lines_tcp
+#logic/local_audio_input
+from collections import deque
+import numpy as np
 import sounddevice as sd
-import numpy as np
-
-import sounddevice as sd
-import numpy as np
-
-from logic.foxy_config import *
-from logic.foxy_utils import logger, send_one_line_tcp, receive_lines_tcp
-import sounddevice as sd
-import numpy as np
-import librosa
-import numpy as np
 from scipy.signal import resample
+import librosa
+import logging
+
+logger = logging.getLogger(__name__)
+
+class BaseVAD:
+    """Базовый класс для детектора голоса (VAD)."""
+    def __init__(self, fifo):
+        self.fifo = fifo  # Ссылка на FIFO-буфер
+
+    def analyze(self):
+        """
+        Анализирует данные из FIFO и возвращает состояние флага voice_detected.
+        В базовой реализации всегда возвращает True.
+        """
+        # Извлекаем данные из FIFO для анализа
+        analysis_data = np.array(self.fifo)
+        if len(analysis_data) > 0:
+            # Здесь можно добавить логику анализа данных
+            return True  # Всегда возвращаем True для фейкового VAD
+        return False
 
 class LocalAudioInput:
-    def __init__(self, samplerate=None, blocksize=32768, device=None):
+    def __init__(self, samplerate=None, blocksize=32768, device=None, vad_frame_size=16000, accumulation_buffer_size=1):
         """
         Инициализация захвата аудио с локального устройства.
 
         :param samplerate: Частота дискретизации (если None, используется частота устройства по умолчанию).
         :param blocksize: Размер блока аудиоданных.
         :param device: ID аудиоустройства (если None, используется устройство по умолчанию).
+        :param vad_frame_size: Минимальное количество данных для анализа ВАД (в сэмплах).
+        :param accumulation_buffer_size: Размер буфера для накопления (в секундах).
         """
         self.samplerate = samplerate
         self.blocksize = blocksize
         self.device = device
         self.stream = None
         self.audio_callback = None
+
+        # FIFO для временного хранения данных
+        self.fifo = deque()  # Динамический FIFO
+        self.vad_frame_size = vad_frame_size  # Минимальный размер данных для анализа ВАД
+
+        # Буфер для накопления
+        self.accumulation_buffer = deque(maxlen=16000 * accumulation_buffer_size)
+
+        # Инициализация базового VAD
+        self.vad = BaseVAD(self.fifo)
+        self.voice_detected = False  # Флаг детекции голоса
 
     def start(self):
         """Запуск захвата аудио."""
@@ -58,48 +82,59 @@ class LocalAudioInput:
             self.stream.close()
             self.stream = None
 
-
-
     def callback(self, indata, frames, time, status):
+        """Callback-функция для обработки аудиоданных."""
         if status:
             logger.warning(f"Audio input status: {status}")
 
         try:
-            if indata.ndim > 1 and indata.shape[1] > 1:
-                indata = np.mean(indata, axis=1)  # Преобразуем стерео в моно
+            # Обработка данных (преобразование стерео в моно, ресемплинг и т.д.)
+            processed_data = self._process_audio(indata)
 
-            indata = indata.astype(np.float32)
+            # Добавление данных в FIFO
+            self.fifo.extend(processed_data)
 
-            # Логирование количества данных
-            #logger.debug(f"Received {len(indata)} samples at {self.samplerate} Hz")
+            # Проверяем, достаточно ли данных для анализа ВАД
+            if len(self.fifo) >= self.vad_frame_size:
+                # Анализ данных с помощью VAD
+                self.voice_detected = self.vad.analyze()
 
-            # Проверка на минимальное количество сэмплов
-            if len(indata) < 2:
-                indata = np.pad(indata, (0, 2 - len(indata)), mode="constant")
-                logger.warning("Padded input data to avoid resampling error.")
+                # Передача данных в буфер для накопления (если голос обнаружен)
+                if self.voice_detected:
+                    self.accumulation_buffer.extend(self.fifo)
 
-            # Используем Scipy вместо librosa для ресэмплинга
-            if self.samplerate != 16000:
-                target_len = int(len(indata) * (16000 / self.samplerate))
-                indata = resample(indata, target_len)
+                # Очистка FIFO (если данные переданы в буфер)
+                if self.voice_detected:
+                    self.fifo.clear()
 
-            # Удаление тишины
-            indata, _ = librosa.effects.trim(indata, top_db=30)
-
-            # Преобразование в int16
-            indata = np.clip(indata * 32767, -32768, 32767).astype(np.int16)
-
-            #logger.info(f"Processed audio: {indata.shape}, dtype={indata.dtype}, sr=16000")
-
-            if self.audio_callback:
-                self.audio_callback(indata)
+            # Передача данных из буфера в callback (если буфер заполнен)
+            if len(self.accumulation_buffer) >= self.accumulation_buffer.maxlen:
+                if self.audio_callback:
+                    self.audio_callback(np.array(self.accumulation_buffer))
+                self.accumulation_buffer.clear()
 
         except Exception as e:
             logger.error(f"Error processing audio data: {e}")
 
+    def _process_audio(self, indata):
+        """Обработка аудиоданных: преобразование стерео в моно, ресемплинг и т.д."""
+        if indata.ndim > 1 and indata.shape[1] > 1:
+            indata = np.mean(indata, axis=1)  # Преобразуем стерео в моно
 
+        indata = indata.astype(np.float32)
 
+        # Ресемплинг
+        if self.samplerate != 16000:
+            target_len = int(len(indata) * (16000 / self.samplerate))
+            indata = resample(indata, target_len)
 
+        # Удаление тишины
+        indata, _ = librosa.effects.trim(indata, top_db=30)
+
+        # Преобразование в int16
+        indata = np.clip(indata * 32767, -32768, 32767).astype(np.int16)
+
+        return indata
 
     def set_audio_callback(self, callback):
         """Установка callback-функции для обработки аудиоданных."""

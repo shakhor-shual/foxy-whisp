@@ -1,3 +1,4 @@
+#logic/foxy_config.py
 import logging
 
 # Константы
