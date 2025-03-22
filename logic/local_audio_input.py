@@ -15,7 +15,7 @@ import numpy as np
 from scipy.signal import resample
 
 class LocalAudioInput:
-    def __init__(self, samplerate=None, blocksize=16000, device=None):
+    def __init__(self, samplerate=None, blocksize=32768, device=None):
         """
         Инициализация захвата аудио с локального устройства.
 

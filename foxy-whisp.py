@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from logic.foxy_config import *
-from logic.foxy_utils import load_audio_chunk, add_shared_args, set_logging, logger, get_port_status, create_tokenizer
+from logic.foxy_utils import logger
 from logic.local_audio_input import LocalAudioInput
 from logic.foxy_manager import FoxyManager
 
@@ -9,8 +9,40 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 import threading
 
+##########################
+def add_shared_args(parser):
+    """Adds shared arguments for ASR configuration."""
 
 
+    parser.add_argument("--listen", type=str, default="tcp", choices=["tcp", "audio_device"], help="Source of audio input: 'tcp' (default) or 'audio_device'.")
+    parser.add_argument("--audio-device", type=int, default=None, help="ID of the audio input device (if --listen=audio_device).")
+
+    parser.add_argument('--lan', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
+    parser.add_argument('--task', type=str, default='transcribe', choices=["transcribe", "translate"], help="Task: transcription or translation.")
+    parser.add_argument('--vad', action="store_true", default=False, help="Enable VAD (Voice Activity Detection).")
+    parser.add_argument('--vac', action="store_true", default=False, help="Enable VAC (Voice Activity Controller).")
+    parser.add_argument('--vac-chunk-size', type=float, default=0.04, help="VAC segment size in seconds.")
+
+    parser.add_argument('--backend', type=str, default="faster-whisper", choices=["faster-whisper", "whisper_timestamped", "openai-api"], help="Choose ASR-backend for Speech-To-Text.")
+
+    parser.add_argument('--model', type=str, default='large-v3-turbo', choices=[
+        "tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium", "large-v1", "large-v2", "large-v3", "large-v3-turbo"
+    ], help="Whisper model to use (default: large-v3-turbo).")
+    parser.add_argument('--model-cache-dir', type=str, default=None, help="Directory for caching models.")
+    parser.add_argument('--model-dir', type=str, default=None, help="Directory containing the Whisper model.")
+    parser.add_argument("--warmup-file", type=str, dest="warmup_file", help="Path to a speech audio file to warm up Whisper.")
+
+    parser.add_argument('--buffer-trimming', type=str, default="segment", choices=["sentence", "segment"], help="Buffer trimming strategy.(e.g., trim by completed senteces or by defined time segments)")
+    parser.add_argument('--buffer-trimming-sec', type=float, default=15, help="Buffer trimming threshold in seconds.(for 'segment' trimming strategy) ")
+    parser.add_argument('--min-chunk-size', type=float, default=1.0, help="Minimum audio segment size in seconds.")
+
+    parser.add_argument("-l", "--log-level", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='DEBUG', help="Logging level.")
+    parser.add_argument("--gui", action="store_true", help="Launch the server with a control GUI.")
+    parser.add_argument("--host", type=str, default='0.0.0.0', help="Host address to bind the server to.")
+    parser.add_argument("--port", type=int, default=43007, help="TCP Port number for the server income audio stream.")
+
+
+##########################################################
 class FoxyServerGUI:
     def __init__(self, root, parser, args):
         self.root = root
@@ -37,7 +69,7 @@ class FoxyServerGUI:
         self.create_advanced_frame()
         self.create_audio_source_controls()
         self.create_apply_button()
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self.gui_on_close)
 
     def create_main_frame(self):
         """Создание основного контейнера."""
@@ -46,10 +78,10 @@ class FoxyServerGUI:
 
     def create_buttons(self):
         """Создание кнопок управления."""
-        self.start_stop_button = ttk.Button(self.main_frame, text="Start Server", command=self.toggle_server)
+        self.start_stop_button = ttk.Button(self.main_frame, text="Start Server", command=self.gui_toggle_server)
         self.start_stop_button.pack(fill=tk.X, pady=5)
 
-        self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.toggle_advanced)
+        self.advanced_button = ttk.Button(self.main_frame, text="To Advanced", command=self.gui_toggle_advanced)
         self.advanced_button.pack(fill=tk.X, pady=5)
 
     def create_audio_level_indicator(self):
@@ -76,16 +108,16 @@ class FoxyServerGUI:
         self.button_frame = ttk.Frame(self.text_frame)
         self.button_frame.pack(fill=tk.X, pady=5)
 
-        self.clear_btn = tk.Button(self.button_frame, text="✗", font=("Monospace", 12, "bold"), command=self.clear_text)
+        self.clear_btn = tk.Button(self.button_frame, text="✗", font=("Monospace", 12, "bold"), command=self.gui_clear_text)
         self.clear_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        self.save_btn = tk.Button(self.button_frame, text="▽", font=("Monospace", 12, "bold"), command=self.save_text)
+        self.save_btn = tk.Button(self.button_frame, text="▽", font=("Monospace", 12, "bold"), command=self.gui_save_text)
         self.save_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        self.ask_btn = tk.Button(self.button_frame, text="?", font=("Monospace", 12, "bold"), command=self.show_help)
+        self.ask_btn = tk.Button(self.button_frame, text="?", font=("Monospace", 12, "bold"), command=self.gui_show_help)
         self.ask_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.toggle_mute)
+        self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.gui_toggle_mute)
         self.mute_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
         self.text_area = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
@@ -128,7 +160,7 @@ class FoxyServerGUI:
         """Обработка изменения выбранного источника аудио."""
         self.args.listen = self.source_var.get()
         self.update_audio_device_visibility()
-        self.apply_changes()
+        self.gui_apply_changes()
 
     def update_audio_device_visibility(self):
         """Обновляет видимость элементов управления аудиоустройством."""
@@ -154,11 +186,11 @@ class FoxyServerGUI:
         if selected_device:
             device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
             self.args.audio_device = device_id
-            self.apply_changes()
+            self.gui_apply_changes()
 
     def create_apply_button(self):
         """Создание кнопки 'Apply'."""
-        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.apply_changes, state=tk.DISABLED)
+        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.gui_apply_changes, state=tk.DISABLED)
         self.apply_button.pack(fill=tk.X, pady=5)
 
     def add_parameter_controls(self):
@@ -225,7 +257,7 @@ class FoxyServerGUI:
         """Обработка изменений параметров."""
         self.apply_button.config(state=tk.NORMAL)
 
-    def apply_changes(self):
+    def gui_apply_changes(self):
         """Применение изменений параметров."""
         if self.server_running:
             logger.warning("Cannot apply changes while server is running.")
@@ -266,28 +298,28 @@ class FoxyServerGUI:
 
         logger.info("Changes applied successfully.")
 
-    def toggle_server(self):
+    def gui_toggle_server(self):
         """Переключение состояния сервера."""
         if self.server_running:
-            self.stop_server()
+            self.gui_stop_server()
             if not self.server_running:
                 self.start_stop_button.config(text="Start Server")
             else:
                 logger.error("Failed to stop the server.")
         else:
-            self.start_server()
+            self.gui_start_server()
             if self.server_running:
                 self.start_stop_button.config(text="Stop Server")
             else:
                 logger.error("Failed to start the server.")
 
-    def start_server(self):
+    def gui_start_server(self):
         """Запуск сервера."""
         if self.server_running:
             logger.warning("Server is already running.")
             return
 
-        self.apply_changes()
+        self.gui_apply_changes()
         self.stop_event.clear()
 
         try:
@@ -299,7 +331,7 @@ class FoxyServerGUI:
             logger.error(f"Failed to start server: {e}")
             self.server_running = False
 
-    def stop_server(self):
+    def gui_stop_server(self):
         """Остановка сервера."""
         if not self.server_running:
             logger.warning("Server is not running.")
@@ -329,7 +361,7 @@ class FoxyServerGUI:
             self.server_running = False
             self.start_stop_button.config(text="Start Server")
 
-    def toggle_advanced(self):
+    def gui_toggle_advanced(self):
         """Переключение между основным интерфейсом и расширенными настройками."""
         if self.advanced_options_visible:
             self.advanced_frame.pack_forget()
@@ -342,18 +374,11 @@ class FoxyServerGUI:
             self.advanced_frame.pack(fill=tk.BOTH, expand=True)
             self.advanced_button.config(text="To Transcription")
 
-    def on_close(self):
+    def gui_on_close(self):
         """Обработка закрытия окна."""
         if self.server_running:
-            self.stop_server()
+            self.gui_stop_server()
         self.root.destroy()
-
-    # def append_text(self, text):
-    #     """Добавление текста в текстовое поле."""
-    #     self.text_area.config(state=tk.NORMAL)
-    #     self.text_area.insert(tk.END, text)
-    #     self.text_area.see(tk.END)
-    #     self.text_area.config(state=tk.DISABLED)
 
     def append_text(self, text):
         """Добавление текста в текстовое поле."""
@@ -365,27 +390,26 @@ class FoxyServerGUI:
             self.text_area.see(tk.END)
             self.text_area.config(state=tk.DISABLED)
 
-    def clear_text(self):
+    def gui_clear_text(self):
         """Очистка текстового поля."""
         self.text_area.config(state=tk.NORMAL)
         self.text_area.delete(1.0, tk.END)
         self.text_area.config(state=tk.DISABLED)
 
-    def save_text(self):
+    def gui_save_text(self):
         """Сохранение содержимого текстового поля в файл."""
         file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
         if file_path:
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(self.text_area.get(1.0, tk.END))
 
-    def show_help(self):
+    def gui_show_help(self):
         """Заглушка для кнопки помощи."""
         print("Help button clicked")
 
-    def toggle_mute(self):
+    def gui_toggle_mute(self):
         """Заглушка для кнопки отключения звука."""
         print("Mute button clicked")
-
 
 
 def main():

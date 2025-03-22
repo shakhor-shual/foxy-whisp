@@ -1,33 +1,9 @@
 from  logic.foxy_config import *
-from logic.foxy_utils import load_audio_chunk,  add_shared_args, install_package, set_logging, logger, send_one_line_tcp, receive_lines_tcp, get_port_status
-
-from logic.asr_backends import FasterWhisperASR, OpenaiApiASR, WhisperTimestampedASR
+from logic.foxy_utils import load_audio_chunk,  install_package, set_logging, logger, send_one_line_tcp, receive_lines_tcp, get_port_status
 from logic.outcomes_buffer import IdeasBuffer
 
 import sys
-import argparse
-import os
-import logging
 import numpy as np
-import time
-import select
-import io
-import soundfile #as sf
-import librosa
-import socket
-import line_packet
-import psutil
-from functools import lru_cache
-import math
-from typing import List, Tuple, Optional, Any, IO
-from abc import ABC, abstractmethod
-import subprocess
-import importlib
-from mqtt_handler import MQTTHandler
-import tkinter as tk
-from tkinter import ttk
-import threading
-
 
 ################################################################################################
 class OnlineASRProcessor:

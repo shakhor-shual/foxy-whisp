@@ -1,5 +1,9 @@
+# logic/foxy_processor.py
+from logic.foxy_config import *
+from logic.foxy_utils import logger, send_one_line_tcp, receive_lines_tcp
+from logic.local_audio_input import LocalAudioInput
+
 import io
-import time
 import select
 import numpy as np
 import soundfile as sf
@@ -8,18 +12,13 @@ from collections import deque
 from abc import ABC, abstractmethod
 from itertools import islice
 
-from logic.foxy_config import *
-from logic.foxy_utils import logger, send_one_line_tcp, receive_lines_tcp
-from logic.local_audio_input import LocalAudioInput
 
-SAMPLING_RATE = 16000  # Предполагаемая частота дискретизации
-PACKET_SIZE = 4096
-
+##########################
 class AudioSource(ABC):
     @abstractmethod
     def receive_audio(self):
         pass
-
+##################################
 class TCPAudioSource(AudioSource):
     def __init__(self, conn, timeout=1):
         self.conn = conn
@@ -38,7 +37,8 @@ class TCPAudioSource(AudioSource):
                     return None
             cycles += 1
         return None
-
+    
+##################################
 class LocalAudioSource(AudioSource):
     def __init__(self, device, callback=None):
         self.local_audio_input = LocalAudioInput(device=device)
@@ -60,7 +60,8 @@ class LocalAudioSource(AudioSource):
         if len(self.audio_buffer) > 0:
             return self.audio_buffer.popleft()  # Возвращаем данные из буфера
         return None  # Если буфер пуст
-
+    
+############################3
 class FoxyProcessor:
     def __init__(self, audio_source, mqtt_handler=None, asr_processor=None, minimal_chunk=None, 
                  language="en", tcp_echo=True, callback=None):
@@ -124,9 +125,8 @@ class FoxyProcessor:
             if audio_chunk is None or len(audio_chunk) == 0:
                 self.gui_callback(0)
                 return   # Сброс в ноль при отсутствии данных
-
-            # Вычисляем RMS (среднеквадратичное значение)
-            rms = np.sqrt(np.mean(np.square(audio_chunk)))
+            
+            rms = np.sqrt(np.mean(np.square(audio_chunk))) # Вычисляем RMS (среднеквадратичное значение)
 
             # Преобразуем RMS в dB
             min_rms = 1e-5  # Минимальное значение, чтобы избежать log(0)
@@ -146,7 +146,6 @@ class FoxyProcessor:
         """Получение аудиочанка и отслеживание простоев."""
         out = []
         min_limit = self.minimal_chunk * SAMPLING_RATE
-        print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
         while sum(len(x) for x in out) < min_limit:
             raw_bytes = self.audio_source.receive_audio()
             print(f"===VOID_COUNT========={self.void_counter}============")
