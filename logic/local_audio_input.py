@@ -128,9 +128,6 @@ class LocalAudioInput:
             target_len = int(len(indata) * (16000 / self.samplerate))
             indata = resample(indata, target_len)
 
-        # Удаление тишины
-        indata, _ = librosa.effects.trim(indata, top_db=30)
-
         # Преобразование в int16
         indata = np.clip(indata * 32767, -32768, 32767).astype(np.int16)
 
