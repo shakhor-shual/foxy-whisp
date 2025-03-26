@@ -1,0 +1,4 @@
+YES message
+YES message
+[SERVER] Failed to start pipeline: daemonic processes are not allowed to have children
+

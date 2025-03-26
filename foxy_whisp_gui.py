@@ -1,7 +1,8 @@
 # foxy_whisp_gui.py
+from multiprocessing import Process
+from multiprocessing import Queue as MPQueue
 import tkinter as tk
 from tkinter import ttk, filedialog
-from multiprocessing import Process, Queue
 import threading
 import argparse
 from logic.foxy_utils import add_shared_args, logger
@@ -9,13 +10,12 @@ from logic.local_audio_input import LocalAudioInput
 from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
 
-
 class FoxyWhispGUI:
-    def __init__(self, gui_to_manager_queue, manager_to_gui_queue, args, parser):
-        self.gui_to_manager_queue = gui_to_manager_queue
-        self.manager_to_gui_queue = manager_to_gui_queue
+    def __init__(self, gui_to_server: MPQueue, server_to_gui: MPQueue, args, parser):
+        self.gui_to_server = gui_to_server
+        self.server_to_gui = server_to_gui
         self.args = args
-        self.parser = parser  # Сохраняем parser как атрибут    
+        self.parser = parser
 
         self.root = tk.Tk()
         self.root.geometry("300x900")
@@ -27,12 +27,8 @@ class FoxyWhispGUI:
         self.widgets = {}
         self.audio_input = None
 
-        self.setup_gui()  # Исправлено на setup_gui (было setup_gui)
+        self.setup_gui()
         self.start_queue_listener()
-
-    def run(self):
-        """Запуск основного цикла обработки событий tkinter."""
-        self.root.mainloop()
 
     def setup_gui(self):
         """Настройка основного интерфейса."""
@@ -42,134 +38,175 @@ class FoxyWhispGUI:
         self.create_text_area()
         self.create_advanced_frame()
         self.create_apply_button()
-        self.root.protocol("WM_DELETE_WINDOW", self.gui_on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.update_controls_activity()
 
     def create_main_frame(self):
-        """Создание основного контейнера."""
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
     def create_control_buttons(self):
-        """Создание кнопок управления и элементов выбора аудиоисточника."""
         self.control_frame = ttk.Frame(self.main_frame)
         self.control_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        # Кнопка запуска/остановки сервера
-        self.start_stop_button = ttk.Button(self.control_frame, text="Start Server", command=self.gui_toggle_server)
-        self.start_stop_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+        # Server control button
+        self.server_btn = ttk.Button(
+            self.control_frame,
+            text="Start Server",
+            command=self.toggle_server
+        )
+        self.server_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
 
-        # Кнопка переключения источника аудио (TCP/Audio Device)
-        self.source_button = ttk.Button(self.control_frame, text="TCP", command=self.gui_toggle_audio_source)
-        self.source_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+        # Audio source toggle
+        self.source_btn = ttk.Button(
+            self.control_frame,
+            text="TCP" if self.args.listen == "tcp" else "Audio Device",
+            command=self.toggle_audio_source
+        )
+        self.source_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
 
-        # Кнопка включения/выключения записи аудио
-        self.record_button = ttk.Button(self.control_frame, text="Start Recording", command=self.gui_toggle_recording)
-        self.record_button.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
+        # Recording control
+        self.record_btn = ttk.Button(
+            self.control_frame,
+            text="Start Recording",
+            command=self.toggle_recording
+        )
+        self.record_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
 
-        # Комбобокс выбора аудиоустройства
-        self.device_combobox = ttk.Combobox(self.control_frame, state="readonly")
-        self.device_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5, pady=5)
-        self.device_combobox.bind("<<ComboboxSelected>>", self.on_audio_device_change)
-
-        # Обновляем список устройств
+        # Audio device selection
+        self.device_cb = ttk.Combobox(self.control_frame, state="readonly")
+        self.device_cb.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5, pady=5)
+        self.device_cb.bind("<<ComboboxSelected>>", self.on_device_change)
         self.update_audio_devices()
 
-        # Кнопка перехода к расширенным настройкам
-        self.advanced_button = ttk.Button(self.control_frame, text="To Advanced", command=self.gui_toggle_advanced)
-        self.advanced_button.pack(side=tk.RIGHT, fill=tk.X, padx=5, pady=5)
+        # Advanced options toggle
+        self.advanced_btn = ttk.Button(
+            self.control_frame,
+            text="Advanced",
+            command=self.toggle_advanced
+        )
+        self.advanced_btn.pack(side=tk.RIGHT, fill=tk.X, padx=5, pady=5)
 
     def update_audio_devices(self):
-        """Обновляет список доступных аудиоустройств."""
         devices = LocalAudioInput.list_devices()
         input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices if d["max_input_channels"] > 0]
-        self.device_combobox["values"] = input_devices
+        self.device_cb["values"] = input_devices
 
         if input_devices:
             default_device = LocalAudioInput.get_default_input_device()
-            self.device_combobox.set(f"{devices[default_device]['name']} (ID: {default_device})")
+            self.device_cb.set(f"{devices[default_device]['name']} (ID: {default_device})")
             self.args.audio_device = default_device
 
-    def gui_toggle_audio_source(self):
-        """Переключение между TCP и Audio Device."""
-        if self.args.listen == "tcp":
-            self.args.listen = "audio_device"
-            self.source_button.config(text="Audio Device")
-            self.update_audio_devices()
+    def toggle_server(self):
+        """Toggle server state and update UI"""
+        if self.server_running:
+            self.send_command("stop")
+            # Не меняем текст кнопки здесь - дождемся ответа от сервера
         else:
-            self.args.listen = "tcp"
-            self.source_button.config(text="TCP")
+            self.send_command("start", vars(self.args))
+            # Не меняем текст кнопки здесь - дождемся ответа от сервера
 
+    def toggle_audio_source(self):
+        """Switch between TCP and Audio Device sources"""
+        self.args.listen = "audio_device" if self.args.listen == "tcp" else "tcp"
+        self.source_btn.config(text="Audio Device" if self.args.listen == "audio_device" else "TCP")
         self.update_controls_activity()
-        self.gui_apply_changes()
+        self.send_command("update_params", vars(self.args))
 
     def update_controls_activity(self):
-        """Обновление активности элементов в зависимости от выбранного источника аудио."""
-        if self.args.listen == "tcp":
-            self.record_button.config(state=tk.DISABLED)
-            self.device_combobox.config(state=tk.DISABLED)
-        else:
-            self.record_button.config(state=tk.NORMAL)
-            self.device_combobox.config(state="readonly")
+        """Update controls state based on audio source"""
+        state = tk.NORMAL if self.args.listen == "audio_device" else tk.DISABLED
+        self.record_btn.config(state=state)
+        self.device_cb.config(state="readonly" if state == tk.NORMAL else tk.DISABLED)
 
-    def on_audio_device_change(self, event=None):
-        """Обработка изменения выбранного аудиоустройства."""
-        selected_device = self.device_combobox.get()
-        if selected_device:
-            device_id = int(selected_device.split("(ID: ")[1].rstrip(")"))
+    def on_device_change(self, event=None):
+        """Handle audio device selection change"""
+        selected = self.device_cb.get()
+        if selected:
+            device_id = int(selected.split("(ID: ")[1].rstrip(")"))
             self.args.audio_device = device_id
-            self.gui_apply_changes()
+            self.send_command("update_params", vars(self.args))
 
     def create_audio_level_indicator(self):
-        """Создание индикатора уровня аудиосигнала."""
-        self.audio_level_frame = ttk.Frame(self.main_frame)
-        self.audio_level_frame.pack(fill=tk.X, pady=5)
+        """Create audio level meter"""
+        self.level_frame = ttk.Frame(self.main_frame)
+        self.level_frame.pack(fill=tk.X, pady=5)
 
-        self.audio_level_label = ttk.Label(self.audio_level_frame, text="Audio Level:")
-        self.audio_level_label.pack(side=tk.LEFT)
+        self.level_label = ttk.Label(self.level_frame, text="Audio Level:")
+        self.level_label.pack(side=tk.LEFT)
 
-        self.audio_level_bar = ttk.Progressbar(self.audio_level_frame, orient=tk.HORIZONTAL, length=150, mode="determinate")
-        self.audio_level_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.level_bar = ttk.Progressbar(
+            self.level_frame,
+            orient=tk.HORIZONTAL,
+            length=150,
+            mode="determinate"
+        )
+        self.level_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
     def update_audio_level(self, level):
-        """Обновление индикатора уровня аудиосигнала."""
-        self.audio_level_bar["value"] = level
-        self.audio_level_bar.update()
+        """Update audio level meter"""
+        self.level_bar["value"] = level
 
     def create_text_area(self):
-        """Создание текстового поля и кнопок управления."""
+        """Create text display area with controls"""
         self.text_frame = ttk.Frame(self.main_frame)
         self.text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        self.button_frame = ttk.Frame(self.text_frame)
-        self.button_frame.pack(fill=tk.X, pady=5)
+        # Toolbar buttons
+        self.toolbar = ttk.Frame(self.text_frame)
+        self.toolbar.pack(fill=tk.X, pady=5)
 
-        self.clear_btn = tk.Button(self.button_frame, text="✗", font=("Monospace", 12, "bold"), command=self.gui_clear_text)
+        self.clear_btn = tk.Button(
+            self.toolbar,
+            text="✗",
+            font=("Monospace", 12, "bold"),
+            command=self.clear_text
+        )
         self.clear_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        self.save_btn = tk.Button(self.button_frame, text="▽", font=("Monospace", 12, "bold"), command=self.gui_save_text)
+        self.save_btn = tk.Button(
+            self.toolbar,
+            text="▽",
+            font=("Monospace", 12, "bold"),
+            command=self.save_text
+        )
         self.save_btn.pack(side=tk.LEFT, fill=tk.X, padx=2)
 
-        self.ask_btn = tk.Button(self.button_frame, text="?", font=("Monospace", 12, "bold"), command=self.gui_show_help)
-        self.ask_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
+        self.help_btn = tk.Button(
+            self.toolbar,
+            text="?",
+            font=("Monospace", 12, "bold"),
+            command=self.show_help
+        )
+        self.help_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        self.mute_btn = tk.Button(self.button_frame, text="▣", font=("Monospace", 12, "bold"), command=self.gui_toggle_recording)
+        self.mute_btn = tk.Button(
+            self.toolbar,
+            text="▣",
+            font=("Monospace", 12, "bold"),
+            command=self.toggle_recording
+        )
         self.mute_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        self.text_area = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
-        self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Text display area
+        self.text = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.scrollbar = ttk.Scrollbar(self.text_frame, orient=tk.VERTICAL, command=self.text_area.yview)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.text_area.config(yscrollcommand=self.scrollbar.set)
+        self.scroll = ttk.Scrollbar(
+            self.text_frame,
+            orient=tk.VERTICAL,
+            command=self.text.yview
+        )
+        self.scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.text.config(yscrollcommand=self.scroll.set)
 
     def create_advanced_frame(self):
-        """Создание фрейма для расширенных настроек."""
+        """Create advanced options frame"""
         self.advanced_frame = ttk.Frame(self.main_frame)
         self.add_parameter_controls()
 
     def add_parameter_controls(self):
-        """Добавление элементов управления для параметров."""
+        """Add controls for all config parameters"""
         for action in self.parser._actions:
             if action.dest in ("help", "listen"):
                 continue
@@ -185,15 +222,15 @@ class FoxyWhispGUI:
 
             if action.choices:
                 var = tk.StringVar(value=getattr(self.args, action.dest, action.default))
-                combobox = ttk.Combobox(frame, textvariable=var, values=action.choices)
-                combobox.pack(side=tk.RIGHT, fill=tk.X, expand=True)
-                combobox.bind("<<ComboboxSelected>>", self.on_parameter_change)
-                self.widgets[action.dest] = (combobox, var)
+                cb = ttk.Combobox(frame, textvariable=var, values=action.choices)
+                cb.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+                cb.bind("<<ComboboxSelected>>", self.on_parameter_change)
+                self.widgets[action.dest] = (cb, var)
             elif action.type == bool or isinstance(action.default, bool):
                 var = tk.BooleanVar(value=getattr(self.args, action.dest, action.default))
-                checkbutton = ttk.Checkbutton(frame, variable=var, command=self.on_parameter_change)
-                checkbutton.pack(side=tk.RIGHT)
-                self.widgets[action.dest] = (checkbutton, var)
+                cb = ttk.Checkbutton(frame, variable=var, command=self.on_parameter_change)
+                cb.pack(side=tk.RIGHT)
+                self.widgets[action.dest] = (cb, var)
             elif action.type in (float, int):
                 var = tk.StringVar(value=str(getattr(self.args, action.dest, action.default)))
                 entry = ttk.Entry(frame, textvariable=var)
@@ -208,39 +245,44 @@ class FoxyWhispGUI:
                 self.widgets[action.dest] = (entry, var)
 
     def create_tooltip(self, widget, text):
-        """Создание всплывающей подсказки."""
-        tooltip = tk.Toplevel(widget)
-        tooltip.withdraw()
-        tooltip.overrideredirect(True)
-        label = tk.Label(tooltip, text=text, background="yellow", relief="solid", borderwidth=1, padx=5, pady=3)
+        """Create a tooltip for a widget"""
+        tip = tk.Toplevel(widget)
+        tip.withdraw()
+        tip.overrideredirect(True)
+        label = tk.Label(tip, text=text, background="yellow", relief="solid", borderwidth=1, padx=5, pady=3)
         label.pack()
 
-        def on_enter(event):
+        def enter(event):
             x, y, _, _ = widget.bbox("insert")
             x += widget.winfo_rootx() + 25
             y += widget.winfo_rooty() + 25
-            tooltip.geometry(f"+{x}+{y}")
-            tooltip.deiconify()
+            tip.geometry(f"+{x}+{y}")
+            tip.deiconify()
 
-        def on_leave(event):
-            tooltip.withdraw()
+        def leave(event):
+            tip.withdraw()
 
-        widget.bind("<Enter>", on_enter)
-        widget.bind("<Leave>", on_leave)
+        widget.bind("<Enter>", enter)
+        widget.bind("<Leave>", leave)
 
     def on_parameter_change(self, event=None):
-        """Обработка изменений параметров."""
-        self.apply_button.config(state=tk.NORMAL)
+        """Handle parameter changes in advanced options"""
+        self.apply_btn.config(state=tk.NORMAL)
 
     def create_apply_button(self):
-        """Создание кнопки 'Apply'."""
-        self.apply_button = ttk.Button(self.advanced_frame, text="Apply", command=self.gui_apply_changes, state=tk.DISABLED)
-        self.apply_button.pack(fill=tk.X, pady=5)
+        """Create apply button for advanced options"""
+        self.apply_btn = ttk.Button(
+            self.advanced_frame,
+            text="Apply",
+            command=self.apply_changes,
+            state=tk.DISABLED
+        )
+        self.apply_btn.pack(fill=tk.X, pady=5)
 
-    def gui_apply_changes(self):
-        """Применение изменений параметров."""
+    def apply_changes(self):
+        """Apply changes from advanced options"""
         if self.server_running:
-            logger.warning("Cannot apply changes while server is running.")
+            self.append_text("[WARNING] Cannot apply changes while server is running")
             return
 
         for param, (widget, var) in self.widgets.items():
@@ -264,156 +306,160 @@ class FoxyWhispGUI:
         if not self.args.model:
             self.args.model = "large-v3-turbo"
 
-        if hasattr(self, 'apply_button'):
-            self.apply_button.config(state=tk.DISABLED)
-
-        logger.info("Changes applied successfully.")
+        self.apply_btn.config(state=tk.DISABLED)
+        self.append_text("[INFO] Configuration changes applied")
         self.send_command("update_params", vars(self.args))
 
-    def send_command(self, action: str, params: dict = None):
-        """Отправка команды серверу через PipelineMessage"""
-        params = params or {}
-        PipelineMessage.create_command(
-            source='gui',
-            command=action,
-            **params
-        ).send(self.gui_to_manager_queue)
+    def send_command(self, command: str, params: dict = None):
+        """Send command to server"""
+        try:
+            if self.gui_to_server is None:
+                self.append_text("[ERROR] Server connection lost")
+                return
+                
+            PipelineMessage.create_command(
+                source='gui',
+                command=command,
+                **(params or {})
+            ).send(self.gui_to_server)
+        except EOFError:
+            self.append_text("[ERROR] Server connection closed")
+            self.gui_to_server = None
+        except Exception as e:
+            self.append_text(f"[ERROR] Failed to send command: {str(e)}")
 
-    def gui_toggle_server(self):
-        """Отправка команды на запуск/остановку сервера."""
-        if self.server_running:
-            self.send_command("stop_server")
-        else:
-            self.send_command("start_server", vars(self.args))
-
-    def gui_toggle_recording(self):
-        """Переключение состояния записи аудио."""
+    def toggle_recording(self):
+        """Toggle audio recording state"""
         if self.recording:
             self.send_command("stop_recording")
+            self.record_btn.config(text="Start Recording")
         else:
             self.send_command("start_recording")
+            self.record_btn.config(text="Stop Recording")
+        self.recording = not self.recording
 
-    def gui_toggle_advanced(self):
-        """Переключение между основным интерфейсом и расширенными настройками."""
+    def toggle_advanced(self):
+        """Toggle between basic and advanced views"""
         if self.advanced_options_visible:
             self.advanced_frame.pack_forget()
-            self.advanced_options_visible = False
             self.text_frame.pack(fill=tk.BOTH, expand=True)
-            self.advanced_button.config(text="To Advanced")
+            self.advanced_btn.config(text="Advanced")
         else:
             self.text_frame.pack_forget()
-            self.advanced_options_visible = True
             self.advanced_frame.pack(fill=tk.BOTH, expand=True)
-            self.advanced_button.config(text="To Transcription")
+            self.advanced_btn.config(text="Basic")
+        self.advanced_options_visible = not self.advanced_options_visible
 
-    def gui_on_close(self):
-        """Обработка закрытия окна."""
+    def on_close(self):
+        """Handle window close event"""
         if self.server_running:
-            self.send_command("stop_server")
+            self.send_command("stop")
         self.root.destroy()
 
-    def append_text(self, text):
-        """Добавление текста в текстовое поле."""
-        self.text_area.config(state=tk.NORMAL)
-        self.text_area.insert(tk.END, text + "\n")
-        self.text_area.see(tk.END)
-        self.text_area.config(state=tk.DISABLED)
+    def append_text(self, text: str):
+        """Append text to the display area"""
+        self.text.config(state=tk.NORMAL)
+        self.text.insert(tk.END, text + "\n")
+        self.text.see(tk.END)
+        self.text.config(state=tk.DISABLED)
 
-    def gui_clear_text(self):
-        """Очистка текстового поля."""
-        self.text_area.config(state=tk.NORMAL)
-        self.text_area.delete(1.0, tk.END)
-        self.text_area.config(state=tk.DISABLED)
+    def clear_text(self):
+        """Clear the text display area"""
+        self.text.config(state=tk.NORMAL)
+        self.text.delete(1.0, tk.END)
+        self.text.config(state=tk.DISABLED)
 
-    def gui_save_text(self):
-        """Сохранение содержимого текстового поля в файл."""
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
-        if file_path:
-            with open(file_path, "w", encoding="utf-8") as file:
-                file.write(self.text_area.get(1.0, tk.END))
+    def save_text(self):
+        """Save text content to file"""
+        path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.text.get(1.0, tk.END))
+            self.append_text(f"[INFO] Text saved to {path}")
 
-    def gui_show_help(self):
-        """Заглушка для кнопки помощи."""
-        print("Help button clicked")
+    def show_help(self):
+        """Show help information"""
+        self.append_text("[HELP] Foxy-Whisp GUI\n"
+                       "Start/Stop Server - Control the processing pipeline\n"
+                       "TCP/Audio Device - Switch audio source\n"
+                       "Start/Stop Recording - Capture audio from device")
 
     def start_queue_listener(self):
-        """Запуск потока для получения данных от FoxyManager."""
-        threading.Thread(target=self.listen_for_updates, daemon=True).start()
+        """Start thread to listen for server messages"""
+        threading.Thread(target=self.listen_for_messages, daemon=True).start()
 
-    def listen_for_updates(self):
-        """Получение данных от FoxyManager и обновление GUI."""
+    def listen_for_messages(self):
+        """Listen for messages from server"""
         while True:
-            message = PipelineMessage.receive(self.manager_to_gui_queue)
-            if message:
-                self.handle_server_message(message)
+            try:
+                # Проверяем существование очереди
+                if self.server_to_gui is None:
+                    break
+                    
+                msg = PipelineMessage.receive(self.server_to_gui, timeout=0.1)
+                if msg:
+                    self.handle_server_message(msg)
+            except EOFError:
+                # Очередь закрыта
+                break
+            except Exception as e:
+                self.append_text(f"[ERROR] Message receive error: {str(e)}")
+                break
 
-    def handle_server_message(self, message: PipelineMessage):
-        """Обработка сообщений от сервера"""
+    def handle_server_message(self, msg: PipelineMessage):
+        """Handle messages from server"""
         try:
-            if message.is_log():
-                log_level = message.content['level'].upper()
-                log_msg = f"[{log_level}] {message.content['message']}"
-                self.append_text(log_msg)
-                
-            elif message.is_status():
-                status = message.get_status()
-                if status == 'pipeline_started':
-                    self.server_running = True
-                    self.start_stop_button.config(text="Stop Server")
-                    self.append_text("[STATUS] Server started")
-                elif status == 'pipeline_stopped':
-                    self.server_running = False
-                    self.start_stop_button.config(text="Start Server")
-                    self.append_text("[STATUS] Server stopped")
-                    
-            elif message.is_data():
-                data_type = message.get_data_type()
-                if data_type == 'transcription':
-                    self.append_text(f"Transcript: {message.content['payload']}")
-                elif data_type == 'audio_level':
-                    self.update_audio_level(message.content['payload'])
-                    
+            if msg.is_log():
+                self.append_text(f"[{msg.source.upper()}] {msg.content['message']}")
+            elif msg.is_status():
+                self.handle_status_message(msg)
+            elif msg.is_data():
+                self.handle_data_message(msg)
         except Exception as e:
             self.append_text(f"[ERROR] Failed to handle message: {str(e)}")
-    # def handle_server_message(self, message: PipelineMessage):
-    #     """Обработка сообщений от сервера."""
-    #     try:
-    #         if message.is_log():
-    #             self.append_text(f"[{message.source.upper()}] {message.content['message']}")
-    #         elif message.is_status():
-    #             self.handle_status(message)
-    #         elif message.is_data():
-    #             self.handle_data(message)
-    #     except Exception as e:
-    #         logger.error(f"Error handling message: {e}")
 
-    def handle_status(self, message: PipelineMessage):
-        """Обработка статусных сообщений."""
-        status = message.get_status()
-        details = message.content.get('details', {})
-        
-        if status == 'pipeline_started':
+    def handle_status_message(self, msg: PipelineMessage):
+        """Handle status updates from server"""
+        status = msg.content.get('status')
+        if status == 'server_started' or status == 'pipeline_started':
             self.server_running = True
-            self.start_stop_button.config(text="Stop Server")
-        elif status == 'pipeline_stopped':
+            self.server_btn.config(text="Stop Server")
+            self.append_text("[STATUS] Server started")
+        elif status == 'server_stopped' or status == 'server_initialized' or status == 'pipeline_stopped':
             self.server_running = False
-            self.start_stop_button.config(text="Start Server")
+            self.server_btn.config(text="Start Server")
+            self.append_text("[STATUS] Server stopped")
+        elif status == 'shutdown':
+            self.server_running = False
+            self.server_btn.config(text="Start Server", state=tk.DISABLED)
+            self.append_text("[STATUS] Server shutdown")
         elif status == 'recording_started':
             self.recording = True
-            self.record_button.config(text="Stop Recording")
+            self.record_btn.config(text="Stop Recording")
+            self.append_text("[STATUS] Recording started")
         elif status == 'recording_stopped':
             self.recording = False
-            self.record_button.config(text="Start Recording")
+            self.record_btn.config(text="Start Recording")
+            self.append_text("[STATUS] Recording stopped")
 
-    def handle_data(self, message: PipelineMessage):
-        """Обработка данных от сервера."""
-        data_type = message.get_data_type()
-        payload = message.content.get('payload')
+    def handle_data_message(self, msg: PipelineMessage):
+        """Handle data messages from server"""
+        data_type = msg.content.get('data_type')
+        payload = msg.content.get('payload')
         
         if data_type == 'transcription':
-            self.append_text(f"[TRANSCRIPTION] {payload}")
+            self.append_text(f"TRANSCRIPT: {payload}")
         elif data_type == 'audio_level':
             self.update_audio_level(payload)
+        elif data_type == 'log':  # Добавляем обработку тестовых лог-сообщений
+            self.append_text(f"TEST: {payload}")
+
+    def run(self):
+        """Run the GUI main loop"""
+        self.root.mainloop()
 
 
 def main():
@@ -421,24 +467,42 @@ def main():
     add_shared_args(parser)
     args = parser.parse_args()
 
-    if args.gui:
-        gui_to_manager = Queue()
-        manager_to_gui = Queue()
+    # Создаем очереди
+    gui_to_server = MPQueue()
+    server_to_gui = MPQueue()
 
-        # Преобразуем args в словарь перед передачей
-        args_dict = vars(args)
-        manager_proc = Process(
-            target=FoxyWhispServer,
-            args=(gui_to_manager, manager_to_gui, args_dict)
-        )
-        manager_proc.start()
+    # Создаем и запускаем сервер
+    server = FoxyWhispServer(gui_to_server, server_to_gui, vars(args))
+    server_proc = Process(target=server.run)
+    server_proc.start()
 
-        gui = FoxyWhispGUI(gui_to_manager, manager_to_gui, args, parser)
+    # Создаем GUI
+    gui = FoxyWhispGUI(gui_to_server, server_to_gui, args, parser)
+    
+    try:
         gui.run()
-
-        manager_proc.join()
-    else:
-        print("GUI mode is disabled. Use FoxyManager directly.")
+    finally:
+        try:
+            # Отправляем команду shutdown если очередь еще существует
+            if gui_to_server is not None and not gui_to_server._closed:
+                gui_to_server.put({'type': 'command', 'command': 'shutdown'})
+            
+            # Ждем завершения сервера
+            server_proc.join(timeout=5.0)
+            
+            # Принудительное завершение если не ответил
+            if server_proc.is_alive():
+                server_proc.terminate()
+                server_proc.join(1.0)
+        finally:
+            # Безопасное закрытие очередей
+            for queue in [gui_to_server, server_to_gui]:
+                try:
+                    if queue is not None and not queue._closed:
+                        queue.close()
+                        queue.join_thread()
+                except:
+                    pass
 
 if __name__ == "__main__":
     main()
