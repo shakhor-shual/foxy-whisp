@@ -226,39 +226,51 @@ class FoxyWhispServer:
         """Обработка команд от GUI"""
         if msg.source == 'gui' and self.queues.from_gui is not None:
             command = msg.content.get('command')
+            params = msg.content.get('params', {})
+            
+            print(f"[SERVER] Received command: {command}")  # Отладочный вывод
+            
             if command == 'start':
                 self.start_pipeline()
             elif command == 'stop':
                 self.stop_pipeline()
             elif command == 'restart':
                 self.restart_pipeline()
-            elif command == 'shutdown':  # Fixed indentation and changed to elif
+            elif command == 'start_recording':
+                # Отправляем команду на запись в SRC
+                if self.processes.get('src'):
+                    PipelineMessage.create_command(
+                        source='server',
+                        command='start_recording'
+                    ).send(self.queues.to_src)
+                    self._send_gui_message(
+                        PipelineMessage.create_status(
+                            source='server',
+                            status='recording_started'
+                        )
+                    )
+            elif command == 'stop_recording':
+                # Отправляем команду остановки записи в SRC
+                if self.processes.get('src'):
+                    PipelineMessage.create_command(
+                        source='server',
+                        command='stop_recording'
+                    ).send(self.queues.to_src)
+                    self._send_gui_message(
+                        PipelineMessage.create_status(
+                            source='server',
+                            status='recording_stopped'
+                        )
+                    )
+            elif command == 'update_params':
+                # Обновление параметров
+                if params:
+                    self.args.update(params)
+                    logger.info("Parameters updated")
+            elif command == 'shutdown':
                 logger.info("Received shutdown command")
                 self.stop_pipeline()
                 self._shutdown_requested = True
-
-    ####################
-    def _handle_control(self, msg: PipelineMessage):
-        """Обработка контрольных сообщений"""
-        if msg.content.get('control') == 'restart':
-            self.restart_pipeline()
-
-    ####################
-    def process_messages(self):
-        """Обработка входящих сообщений с проверкой наличия очередей"""
-        while not self.stop_event.is_set():
-            # Проверяем очередь GUI только если она существует
-            if self.queues.from_gui is not None and (msg := PipelineMessage.receive(self.queues.from_gui)):
-                self._handle_message(msg)
-                continue
-                
-            # Проверяем очереди от компонентов
-            for queue in [self.queues.from_src, self.queues.from_asr]:
-                if msg := PipelineMessage.receive(queue):
-                    self._handle_message(msg)
-                    break
-                    
-            time.sleep(0.01)
 
     ####################
     def start_pipeline(self):
@@ -281,9 +293,17 @@ class FoxyWhispServer:
                     status='pipeline_started'
                 )
             )
+            logger.info("Pipeline started successfully")
 
         except Exception as e:
             logger.error(f"Failed to start pipeline: {e}")
+            self._send_gui_message(
+                PipelineMessage.create_status(
+                    source='system',
+                    status='pipeline_error',
+                    error=str(e)
+                )
+            )
 
     ####################
     def stop_pipeline(self):
@@ -320,6 +340,27 @@ class FoxyWhispServer:
         self.start_pipeline()
 
     ####################
+    def process_messages(self):
+        """Process all incoming messages from queues"""
+        try:
+            # Check GUI queue
+            if self.queues.from_gui is not None:
+                while msg := PipelineMessage.receive(self.queues.from_gui, timeout=0.1):
+                    print(f"[SERVER] Processing message from GUI: {msg.type}")  # Debug output
+                    self._handle_message(msg)
+
+            # Check other component queues
+            for name, queue in [('src', self.queues.from_src), ('asr', self.queues.from_asr)]:
+                while msg := PipelineMessage.receive(queue, timeout=0.1):
+                    print(f"[SERVER] Processing message from {name}: {msg.type}")  # Debug output
+                    self._handle_message(msg)
+                    
+            return True
+        except Exception as e:
+            logger.error(f"Error processing messages: {e}")
+            return False
+
+    ####################
     def run(self):
         """Основной цикл работы сервера"""
         self._send_gui_message(
@@ -331,8 +372,6 @@ class FoxyWhispServer:
         logger.info("Starting FoxyWhisp server")
         
         try:
-            # Удаляем дублирование запуска тестовых сообщений
-            # Оставляем только один метод
             if self.queues.to_gui is not None:
                 logger.info("Starting test message sender...")
                 self.test_running = True
@@ -342,7 +381,9 @@ class FoxyWhispServer:
             self.start_pipeline()
 
             while not self._shutdown_requested:
-                self.process_messages()
+                if not self.process_messages():
+                    logger.error("Message processing failed")
+                    break
                 time.sleep(0.1)
                 
         except Exception as e:
