@@ -1,212 +1,192 @@
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from multiprocessing import Queue, Event
-import queue
-import time  # Добавляем импорт time
-from logic.foxy_pipeline import SRCstage, VADstage, ASRStage
-from foxy_whisp_server import FoxyWhispServer, PipelineQueues
+import pytest
+from unittest.mock import Mock, patch, MagicMock, call
+from multiprocessing import Queue, Event as MPEvent
+from foxy_whisp_server import FoxyWhispServer, PipelineMessage, QueueHandler
+import logging
 
-class TestFoxyWhispServer(unittest.TestCase):
-    def setUp(self):
-        """Инициализация перед каждым тестом"""
-        self.args = {
-            'sample_rate': 16000,
-            'chunk_size': 320,
-            'listen': 'tcp'
-        }
-        self.from_gui_queue = Queue()
-        self.to_gui_queue = Queue()
-        self.server = FoxyWhispServer(
-            from_gui_queue=self.from_gui_queue,
-            to_gui_queue=self.to_gui_queue,
-            args=self.args
+@pytest.fixture
+def mock_queues():
+    """Create properly mocked queues with required methods"""
+    from_gui = MagicMock()
+    from_gui.get.return_value = None
+    from_gui.put.return_value = None
+    to_gui = MagicMock()
+    to_gui.get.return_value = None
+    to_gui.put.return_value = None
+    return {
+        'from_gui': from_gui,
+        'to_gui': to_gui,
+    }
+
+@pytest.fixture
+def server(mock_queues):
+    with patch('signal.signal'):
+        server = FoxyWhispServer(
+            from_gui=mock_queues['from_gui'],
+            to_gui=mock_queues['to_gui'],
+            args={'chunk_size': 512}
+        )
+        # Ensure queues are properly set
+        server.queues.from_gui = mock_queues['from_gui']
+        server.queues.to_gui = mock_queues['to_gui']
+    return server
+
+def test_server_initialization(server):
+    assert not server._shutdown_requested
+    # Correct the isinstance check for stop_event
+    assert isinstance(server.stop_event, type(MPEvent()))
+    assert server.pipe_chunk == 512
+
+def test_send_gui_message(server):
+    test_msg = PipelineMessage.create_log(
+        source='test',
+        message='test message',
+        level='info'
+    )
+    server._send_gui_message(test_msg)
+    server.queues.to_gui.put.assert_called_once()
+
+def test_handle_gui_disconnect(server):
+    with patch('logging.getLogger') as mock_get_logger:
+        mock_root_logger = MagicMock()
+        mock_get_logger.return_value = mock_root_logger
+
+        # Simulate existing handlers
+        mock_root_logger.handlers = [MagicMock(spec=logging.Handler)]
+
+        server._handle_gui_disconnect()
+
+        # Verify QueueHandlers were removed
+        assert all(
+            not isinstance(handler, QueueHandler)
+            for handler in mock_root_logger.handlers
         )
 
-    def tearDown(self):
-        """Очистка после каждого теста"""
-        # Останавливаем сервер
-        if hasattr(self, 'server'):
-            self.server.stop_event.set()
-            # Очищаем очереди
-            self._clear_queues()
-            
-    def _clear_queues(self):
-        """Вспомогательный метод для очистки очередей"""
-        for queue_obj in [
-            self.from_gui_queue, 
-            self.to_gui_queue, 
-            *self.server.queues.__dict__.values()
-        ]:
-            try:
-                while not queue_obj.empty():
-                    queue_obj.get_nowait()
-            except (queue.Empty, AttributeError):
-                continue
-
-    ###############
-    def test_init_queues(self):
-        """Тест инициализации очередей"""
-        queues = self.server._init_queues()
-        self.assertIsInstance(queues, PipelineQueues)
-        self.assertEqual(queues.pipe_audio_2_vad._maxsize, 2 * self.server.pipe_chunk)  # Исправлено maxsize на _maxsize
-        self.assertEqual(queues.pipe_vad_2_asr._maxsize, 2 * self.server.pipe_chunk)
-
-    ###############
-    @patch('logic.foxy_pipeline.SRCstage')
-    @patch('logic.foxy_pipeline.VADStage')
-    @patch('logic.foxy_pipeline.ASRStage')
-    def test_init_stages(self, mock_asr, mock_vad, mock_src):
-        """Тест инициализации стейджей"""
-        # Настраиваем моки для возврата Mock объектов
-        mock_src.return_value = Mock()
-        mock_vad.return_value = Mock()
-        mock_asr.return_value = Mock()
-        
-        self.server._init_stages()
-        
-        # Проверяем вызовы конструкторов с правильными аргументами
-        mock_src.assert_called_once_with(
-            args=self.args,
-            pipe_input=None,
-            in_queue=self.server.queues.to_src_queue,
-            out_queue=self.server.queues.from_src_queue,
-            pipeline_chunk_size=self.server.pipe_chunk
+        # Verify a StreamHandler was added
+        stream_handler_added = any(
+            isinstance(handler, logging.StreamHandler)
+            for handler in mock_root_logger.handlers
         )
-        
-        self.assertIsNotNone(self.server.stages['src'])
-        self.assertIsNotNone(self.server.stages['vad'])
-        self.assertIsNotNone(self.server.stages['asr'])
+        assert stream_handler_added, "StreamHandler was not added to the logger"
 
-    ###############
-    def test_set_stop_events(self):
-        """Тест установки событий остановки"""
-        # Создаем мок-стейджи
-        mock_stages = {
-            'src': Mock(),
-            'vad': Mock(),
-            'asr': Mock()
-        }
-        self.server.stages = mock_stages
-        
-        self.server._set_stop_events()
-        
-        # Проверяем, что set_stop_event был вызван для каждого стейджа
-        for stage in mock_stages.values():
-            stage.set_stop_event.assert_called_once_with(self.server.stop_event)
+        # Verify the StreamHandler's configuration
+        added_handler = next(
+            (handler for handler in mock_root_logger.handlers if isinstance(handler, logging.StreamHandler)),
+            None
+        )
+        assert added_handler is not None
+        assert added_handler.level == logging.INFO
 
-    ###############
-    def test_process_message(self):
-        """Тест обработки сообщений"""
-        # Тестируем различные типы сообщений
-        test_cases = [
-            {"type": "log", "level": "INFO", "message": "test", "process": "test"},
-            {"type": "status", "content": "started"},
-            {"type": "data", "content": {"test": "data"}},
-            {"type": "unknown", "content": "should_warn"}
-        ]
-        
-        for message in test_cases:
-            self.server.process_message(message)
+        # Verify the logger logged the test message
+        mock_root_logger.info.assert_called_with("StreamHandler added to logger")
 
-    ###############
-    @patch('logic.foxy_pipeline.SRCstage')
-    @patch('logic.foxy_pipeline.VADStage')
-    @patch('logic.foxy_pipeline.ASRStage')
-    def test_start_server_pipeline(self, mock_asr, mock_vad, mock_src):
-        """Тест запуска пайплайна"""
-        # Configure mocks to return Mock instances
-        mock_src.return_value = Mock()
-        mock_vad.return_value = Mock()
-        mock_asr.return_value = Mock()
+@pytest.mark.parametrize("msg_type,handler_method", [
+    ('log', '_handle_log'),
+    ('status', '_handle_status'),
+    ('data', '_handle_data'),
+    ('command', '_handle_command'),
+    ('control', '_handle_control')
+])
+def test_message_handling(server, msg_type, handler_method):
+    with patch.object(server, handler_method) as mock_handler:
+        msg = MagicMock()
+        # Setup all is_* methods to return False by default
+        for method in ['is_log', 'is_status', 'is_data', 'is_command', 'is_control']:
+            setattr(msg, method, Mock(return_value=False))
+        # Set the tested method to return True
+        getattr(msg, f'is_{msg_type}').return_value = True
         
-        self.server.start_server_pipeline()
+        server._handle_message(msg)
+        mock_handler.assert_called_once_with(msg)
+
+def test_start_pipeline(server):
+    with patch('foxy_whisp_server.SRCstage') as mock_src, \
+         patch('foxy_whisp_server.ASRstage') as mock_asr:
         
-        # Verify that mocks were called with correct arguments
+        mock_src_instance = mock_src.return_value
+        mock_asr_instance = mock_asr.return_value
+        
+        server.start_pipeline()
+        
         mock_src.assert_called_once()
-        mock_vad.assert_called_once()
         mock_asr.assert_called_once()
-        
-        # Verify stages were set
-        self.assertIsNotNone(self.server.stages['src'])
-        self.assertIsNotNone(self.server.stages['vad'])
-        self.assertIsNotNone(self.server.stages['asr'])
+        assert server.processes['src'] is mock_src_instance
+        assert server.processes['asr'] is mock_asr_instance
+        mock_src_instance.start.assert_called_once()
+        mock_asr_instance.start.assert_called_once()
 
-    ###############
-    def test_stop_server_pipeline(self):
-        """Тест остановки пайплайна"""
-        # Создаем мок-стейджи
-        mock_stages = {
-            'src': Mock(),
-            'vad': Mock(),
-            'asr': Mock()
-        }
-        self.server.stages = mock_stages
-        
-        self.server.stop_server_pipeline()
-        
-        # Проверяем, что stop был вызван для каждого стейджа
-        for stage in mock_stages.values():
-            stage.stop.assert_called_once()
+def test_stop_pipeline(server):
+    server.processes['src'] = Mock()
+    server.processes['asr'] = Mock()
+    
+    server.stop_pipeline()
+    
+    assert server.stop_event.is_set()
+    assert server.processes['src'].join.called
+    assert server.processes['asr'].join.called
 
-    ###############
-    @patch('time.sleep')
-    def test_requests_from_gui(self, mock_sleep):
-        """Тест обработки команд от GUI"""
-        # Setup mocks
-        with patch.object(self.server, 'start_server_pipeline') as mock_start:
-            with patch.object(self.server, 'stop_server_pipeline') as mock_stop:
-                # Create a function to stop the loop after processing
-                def stop_after_commands(*args, **kwargs):
-                    self.server.stop_event.set()
-                mock_stop.side_effect = stop_after_commands
-                
-                # Send commands
-                self.from_gui_queue.put(("command", {"action": "start_server"}))
-                
-                # Run the GUI request processing
-                self.server.requests_from_gui()
-                
-                # Verify the commands were processed
-                mock_start.assert_called_once()
-                mock_sleep.assert_called()
+def test_cleanup(server):
+    # Create a mock queue with all required methods
+    mock_queue = Mock(spec=Queue)
+    mock_queue.close = Mock()
+    mock_queue.join_thread = Mock()
+    
+    server.queues.test_queue = mock_queue
+    server._cleanup()
+    
+    mock_queue.close.assert_called_once()
+    mock_queue.join_thread.assert_called_once()
 
-    def test_process_input_queues(self):
-        """Тест обработки входных очередей"""
-        stop_event = Event()
+def test_handle_signal(server):
+    with patch('logging.getLogger'):
+        server._handle_signal(15, None)  # SIGTERM
         
-        def mock_process_input_queues():
-            while not stop_event.is_set():
-                for queue in [self.server.queues.from_src_queue,
-                            self.server.queues.from_vad_queue,
-                            self.server.queues.from_asr_queue]:
-                    if not queue.empty():
-                        message = queue.get()
-                        self.server.process_message(message)
-                        if message.get("type") == "stop":
-                            stop_event.set()
-                            break
+        assert server._shutdown_requested
+        assert server.stop_event.is_set()
 
-        with patch.object(self.server, 'process_input_queues', 
-                         side_effect=mock_process_input_queues):
-            # Отправляем тестовое сообщение
-            self.server.queues.from_src_queue.put({"type": "stop"})
-            
-            # Запускаем обработку
-            self.server.process_input_queues()
-            
-            # Проверяем, что обработка завершилась
-            self.assertTrue(stop_event.is_set())
+def test_handle_command_shutdown(server):
+    msg = PipelineMessage.create_command(
+        source='gui',
+        command='shutdown'
+    )
+    
+    server._handle_command(msg)
+    
+    assert server._shutdown_requested
 
-    ###############
-    def test_update_params(self):
-        """Тест обновления параметров"""
-        test_params = {"new_param": "value"}
+@pytest.mark.parametrize("log_level", ['info', 'warning', 'error', 'critical'])
+def test_handle_log_levels(server, log_level):
+    with patch('foxy_whisp_server.logger') as mock_logger:
+        msg = PipelineMessage.create_log(
+            source='test',
+            message='test message',
+            level=log_level
+        )
+
+        server._handle_log(msg)
+
+        log_level_value = getattr(logging, log_level.upper())
+        mock_logger.log.assert_called_once_with(log_level_value, '[test] test message')
+
+def test_run(server):
+    from queue import Empty
+    
+    def queue_get_with_timeout(*args, **kwargs):
+        if not server._shutdown_requested:
+            server._shutdown_requested = True
+            return PipelineMessage.create_command(
+                source='test',
+                command='shutdown'
+            )
+        raise Empty()
+
+    server.queues.from_gui.get = Mock(side_effect=queue_get_with_timeout)
+    
+    # Run server with timeout
+    with patch.object(server, '_handle_message') as mock_handle:
+        server.run()
         
-        # Ensure args is a dictionary
-        self.server.args = {}
-        
-        self.server.update_params(test_params)
-        self.assertEqual(self.server.args["new_param"], "value")
-
-if __name__ == '__main__':
-    unittest.main()
+        # Verify shutdown was requested
+        assert server._shutdown_requested
+        # Verify message was handled
+        mock_handle.assert_called_once()

@@ -395,30 +395,39 @@ class FoxyWhispGUI:
         """Listen for messages from server"""
         while True:
             try:
-                # Проверяем существование очереди
                 if self.server_to_gui is None:
+                    print("[GUI] No server queue available")
                     break
                     
                 msg = PipelineMessage.receive(self.server_to_gui, timeout=0.1)
                 if msg:
+                    print(f"[GUI] Raw message received: {msg.__dict__}")  # Отладочный вывод
+                    # Добавляем прямой вывод для тестовых сообщений
+                    if msg.is_log() and msg.source == 'test':
+                        print(f"[GUI] Test message received: {msg.content['message']}")
                     self.handle_server_message(msg)
             except EOFError:
-                # Очередь закрыта
+                print("[GUI] Queue EOF received")
                 break
             except Exception as e:
+                print(f"[GUI] Queue error: {str(e)}")
                 self.append_text(f"[ERROR] Message receive error: {str(e)}")
                 break
 
     def handle_server_message(self, msg: PipelineMessage):
         """Handle messages from server"""
         try:
+            print(f"[GUI] Handling message type: {msg.type}")  # Отладочный вывод
             if msg.is_log():
-                self.append_text(f"[{msg.source.upper()}] {msg.content['message']}")
+                message = msg.content.get('message', '')
+                self.append_text(f"[{msg.source.upper()}] {message}")
+                print(f"[GUI] Log message handled: {message}")  # Отладочный вывод
             elif msg.is_status():
                 self.handle_status_message(msg)
             elif msg.is_data():
                 self.handle_data_message(msg)
         except Exception as e:
+            print(f"[GUI] Error handling message: {str(e)}")  # Отладочный вывод
             self.append_text(f"[ERROR] Failed to handle message: {str(e)}")
 
     def handle_status_message(self, msg: PipelineMessage):

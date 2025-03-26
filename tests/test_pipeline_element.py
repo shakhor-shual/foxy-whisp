@@ -1,186 +1,155 @@
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-from multiprocessing import Queue, Event
-import queue
-from logic.foxy_pipeline import PipelineElement
+from multiprocessing import Event, Queue
+import logging
+from logic.pipeline_element import PipelineElement
+
+class TestPipeElement(PipelineElement):
+    """Test implementation of PipelineElement"""
+    def process_data(self, data):
+        if data == "raise_error":
+            raise ValueError("Test error")
+        # Send processed data through the pipeline
+        self.send_data(f"processed_{data}")
+        return f"processed_{data}"
 
 class TestPipelineElement(unittest.TestCase):
-    class ConcretePipelineElement(PipelineElement):
-        def configure(self):
-            pass
-        
-        def process(self, audio_chunk):
-            return audio_chunk
-            
-        def start(self):
-            pass
-            
-        def stop(self):
-            pass
-
     def setUp(self):
-        self.args = {'test': 'value'}
-        self.pipe_input = Queue()
-        self.pipe_output = Queue()
-        self.in_queue = Queue()
-        self.out_queue = Queue()
-        self.element = self.ConcretePipelineElement(
-            args=self.args,
-            audio_in=self.pipe_input,
-            audio_out=self.pipe_output,
-            in_queue=self.in_queue,
-            out_queue=self.out_queue
+        # Suppress logging during tests
+        logging.disable(logging.ERROR)
+        
+        # Create mocks with required attributes
+        self.stop_event = Mock()
+        self.stop_event.is_set = Mock(return_value=False)
+        self.stop_event.set = Mock()
+
+        self.in_queue = Mock()
+        self.in_queue.get = Mock()
+        self.in_queue.empty = Mock(return_value=False)
+        
+        self.out_queue = Mock()
+        self.out_queue.put = Mock()
+        
+        self.element = TestPipeElement(
+            self.stop_event,
+            self.in_queue,
+            self.out_queue
         )
 
     def tearDown(self):
-        # Очищаем очереди перед закрытием
-        self._clear_queue(self.pipe_input)
-        self._clear_queue(self.pipe_output)
-        self._clear_queue(self.in_queue)
-        self._clear_queue(self.out_queue)
-        
-        # Останавливаем элемент если он запущен
-        if hasattr(self, 'element'):
-            self.element.stop_event.set()
-            if hasattr(self.element, 'process'):
-                self.element.process = lambda x: None
-        
-        # Закрываем очереди
-        for q in [self.pipe_input, self.pipe_output, self.in_queue, self.out_queue]:
-            try:
-                q.close()
-                q.join_thread()
-            except:
-                pass
-
-    def _clear_queue(self, q):
-        """Безопасная очистка очереди"""
-        try:
-            while True:
-                q.get_nowait()
-        except queue.Empty:
-            pass
-
-    def _get_with_timeout(self, q, timeout=1):
-        """Получение данных из очереди с таймаутом"""
-        try:
-            return q.get(timeout=timeout)
-        except queue.Empty:
-            self.fail("Timeout waiting for queue data")
+        # Re-enable logging after tests
+        logging.disable(logging.NOTSET)
 
     def test_init(self):
-        """Тест инициализации элемента пайплайна"""
-        self.assertEqual(self.element.args, self.args)
-        self.assertEqual(self.element.pipe_input, self.pipe_input)
-        self.assertEqual(self.element.audio_out, self.pipe_output)
-        self.assertIsInstance(self.element.stop_event, Event)
-        self.assertIsInstance(self.element.pause_event, Event)
+        """Test initialization"""
+        self.assertEqual(self.element.name, "TestPipeElement")
+        self.assertEqual(self.element.stop_event, self.stop_event)
+        self.assertEqual(self.element.in_queue, self.in_queue)
+        self.assertEqual(self.element.out_queue, self.out_queue)
 
     def test_pipe_read(self):
-        """Тест чтения данных из входной очереди"""
-        test_data = b"test_audio"
-        self.pipe_input.put(test_data)
-        result = self.element.audio_read()
-        self.assertEqual(result, test_data)
+        """Test reading from input queue"""
+        test_data = "test_data"
+        self.in_queue.get.return_value = test_data
         
-        # Проверка таймаута при пустой очереди
-        result = self.element.audio_read()
+        result = self.element.pipe_read()
+        self.assertEqual(result, test_data)
+        self.in_queue.get.assert_called_once()
+
+    def test_pipe_read_error(self):
+        """Test reading error handling"""
+        self.in_queue.get.side_effect = Exception("Test error")
+        
+        result = self.element.pipe_read()
         self.assertIsNone(result)
 
     def test_pipe_write(self):
-        """Тест записи данных в выходную очередь"""
-        test_data = b"test_audio"
-        self.element.pipe_write(test_data)
-        result = self.pipe_output.get()
-        self.assertEqual(result, test_data)
-
-    def test_process_control_commands(self):
-        """Тест обработки управляющих команд"""
-        # Тест команды stop
-        self.in_queue.put({"type": "command", "content": "stop"})
-        self.element.process_control_commands()
-        self.assertTrue(self.element.stop_event.is_set())
-
-        # Тест команды pause
-        self.in_queue.put({"type": "command", "content": "pause"})
-        self.element.process_control_commands()
-        self.assertTrue(self.element.pause_event.is_set())
-
-        # Тест команды resume
-        self.in_queue.put({"type": "command", "content": "resume"})
-        self.element.process_control_commands()
-        self.assertFalse(self.element.pause_event.is_set())
-
-    @patch('time.sleep')  # Мокаем sleep для ускорения тестов
-    def test_run(self, mock_sleep):
-        """Тест основного цикла обработки"""
-        test_data = b"test_audio"
-        self.pipe_input.put(test_data)
+        """Test writing to output queue"""
+        test_data = "test_data"
         
-        # Устанавливаем событие остановки после одной итерации
-        def stop_after_iteration(*args):
-            self.element.stop_event.set()
-            return test_data
+        result = self.element.pipe_write(test_data)
+        self.assertTrue(result)
+        self.out_queue.put.assert_called_once_with(test_data)
 
-        self.element.process = Mock(side_effect=stop_after_iteration)
-        self.element.run()
+    def test_pipe_write_error(self):
+        """Test writing error handling"""
+        self.out_queue.put.side_effect = Exception("Test error")
+        
+        result = self.element.pipe_write("test_data")
+        self.assertFalse(result)
 
-        # Проверяем, что данные были обработаны
-        self.element.process.assert_called_once_with(test_data)
+    def test_process_control_commands_stop(self):
+        """Test processing stop command"""
+        msg = Mock()
+        msg.content = {"command": "stop"}
         
-    @patch('time.sleep')
-    def test_run_with_empty_input(self, mock_sleep):
-        """Тест работы с пустым входом"""
-        def stop_after_delay(*args):
-            self.element.stop_event.set()
-        mock_sleep.side_effect = stop_after_delay
-        
-        self.element.run()
-        mock_sleep.assert_called()
+        result = self.element.process_control_commands(msg)
+        self.assertTrue(result)
+        self.stop_event.set.assert_called_once()
 
-    @patch('time.sleep')
-    def test_run_with_error(self, mock_sleep):
-        """Тест обработки ошибок"""
-        test_data = b"test_audio"
-        self.pipe_input.put(test_data)
+    def test_process_control_commands_other(self):
+        """Test processing non-stop command"""
+        msg = Mock()
+        msg.content = {"command": "other"}
         
-        def raise_error(data):
-            raise Exception("Test error")
-            
-        self.element.process = Mock(side_effect=raise_error)
-        
-        def stop_after_iteration(*args):
-            self.element.stop_event.set()
-        mock_sleep.side_effect = stop_after_iteration
-        
-        self.element.run()
-        
-        # Проверяем статус ошибки
-        result = self._get_with_timeout(self.out_queue)
-        self.assertEqual(result.get("type"), "status")
-        self.assertEqual(result.get("content"), "stopped")
+        result = self.element.process_control_commands(msg)
+        self.assertFalse(result)
+        self.stop_event.set.assert_not_called()
 
     def test_process_control_commands_error(self):
-        """Тест обработки ошибок в командах управления"""
-        self.in_queue.put({"type": "invalid"})
-        self.element.process_control_commands()
-        # Не должно быть исключений
-
-    def test_send_status(self):
-        """Тест отправки статуса"""
-        test_status = "test_status"
-        self.element.send_status(test_status)
-        result = self.out_queue.get()
-        self.assertEqual(result["type"], "status")
-        self.assertEqual(result["content"], test_status)
+        """Test command processing error handling"""
+        msg = Mock()
+        msg.content = None  # Will cause AttributeError
+        
+        result = self.element.process_control_commands(msg)
+        self.assertFalse(result)
 
     def test_send_data(self):
-        """Тест отправки данных"""
-        test_data = {"test": "data"}
+        """Test sending data message"""
+        test_data = "test_data"
+        
         self.element.send_data(test_data)
-        result = self.out_queue.get()
-        self.assertEqual(result["type"], "data")
-        self.assertEqual(result["content"], test_data)
+        self.out_queue.put.assert_called_once_with({
+            'type': 'data',
+            'payload': test_data
+        })
+
+    def test_send_status(self):
+        """Test sending status message"""
+        test_status = "test_status"
+        
+        self.element.send_status(test_status)
+        self.out_queue.put.assert_called_once_with({
+            'type': 'status',
+            'status': test_status
+        })
+
+    def test_run(self):
+        """Test main processing loop"""
+        # Setup mocks
+        self.stop_event.is_set.side_effect = [False, True]  # Run once then stop
+        test_data = "test_data"
+        self.in_queue.get.return_value = test_data
+        
+        # Run the pipeline element
+        self.element.run()
+        
+        # Verify interactions
+        self.in_queue.get.assert_called_once()
+        # The send_data method will be called by process_data
+        self.out_queue.put.assert_called_once_with({
+            'type': 'data',
+            'payload': f'processed_{test_data}'
+        })
+
+    def test_run_error_handling(self):
+        """Test error handling in run loop"""
+        self.stop_event.is_set.side_effect = [False, True]
+        self.in_queue.get.return_value = "raise_error"
+        
+        self.element.run()
+        
+        self.stop_event.set.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

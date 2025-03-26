@@ -1,0 +1,3 @@
+"""
+FoxyWhisp - Speech Recognition Pipeline
+"""

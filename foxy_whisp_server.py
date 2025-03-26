@@ -81,6 +81,9 @@ class FoxyWhispServer:
         signal.signal(signal.SIGINT, self._handle_signal)
         signal.signal(signal.SIGTERM, self._handle_signal)
 
+        self.test_thread = None
+        self.test_running = False
+
     ####################
     def _setup_log_redirection(self):
         """Перенаправление логов в GUI (только если queue.to_gui существует)"""
@@ -94,6 +97,7 @@ class FoxyWhispServer:
         # Устанавливаем только QueueHandler
         queue_handler = QueueHandler(self.queues.to_gui)
         queue_handler.setLevel(logging.INFO)
+        # Fix typo: 'levellevel' -> 'levelname'
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         queue_handler.setFormatter(formatter)
         root_logger.addHandler(queue_handler)
@@ -113,15 +117,26 @@ class FoxyWhispServer:
     def _handle_gui_disconnect(self):
         """Обработка отключения GUI"""
         logger.warning("GUI disconnected! Continuing in headless mode...")
-        # Переключаемся в режим логирования в консоль
+        # Ensure a StreamHandler is added to the root logger
         root_logger = logging.getLogger()
-        root_logger.handlers.clear()
+        # Remove only QueueHandler instances to avoid clearing other handlers
+        root_logger.handlers = [
+            handler for handler in root_logger.handlers
+            if not isinstance(handler, QueueHandler)
+        ]
         
+        # Explicitly add a StreamHandler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
+        
+        # Log a test message to verify the handler is working
+        root_logger.info("StreamHandler added to logger")
+        
+        # Ensure the logger propagates messages
+        root_logger.propagate = True
 
     ####################
     def _force_shutdown(self):
@@ -305,48 +320,6 @@ class FoxyWhispServer:
         self.start_pipeline()
 
     ####################
-    def start_test_messages(self, interval: float = 1.0):
-        """Запускает тестовые сообщения только если есть очередь to_gui"""
-        if self.queues.to_gui is None:
-            logger.info("No GUI queue, test messages disabled")
-            return
-
-        def test_message_loop():
-            counter = 0
-            while not self.stop_event.is_set() and self.queues.to_gui is not None:
-                try:
-                    # Изменяем на создание лог-сообщения вместо data
-                    self._send_gui_message(
-                        PipelineMessage.create_log(
-                            source='test',
-                            message=f"Тестовое сообщение #{counter}",
-                            level='info'
-                        )
-                    )
-                    counter += 1
-                    time.sleep(interval)
-                    
-                except Exception as e:
-                    logger.error(f"Test message error: {e}")
-                    self.queues.to_gui = None
-                    self._setup_log_redirection()
-                    break
-
-        threading.Thread(target=test_message_loop, daemon=True).start()
-
-    ####################
-    def _start_test_logging(self):
-        """Запускает периодическую отправку тестовых лог-сообщений"""
-        def test_log_loop():
-            counter = 0
-            while not self.stop_event.is_set():
-                logger.info(f"Test log message #{counter}")
-                counter += 1
-                time.sleep(5.0)
-                
-        threading.Thread(target=test_log_loop, daemon=True).start()
-
-    ####################
     def run(self):
         """Основной цикл работы сервера"""
         self._send_gui_message(
@@ -358,12 +331,16 @@ class FoxyWhispServer:
         logger.info("Starting FoxyWhisp server")
         
         try:
-            # Запускаем тестовые сообщения если есть GUI
+            # Удаляем дублирование запуска тестовых сообщений
+            # Оставляем только один метод
             if self.queues.to_gui is not None:
-                self._start_test_logging()
-                
+                logger.info("Starting test message sender...")
+                self.test_running = True
+                self.test_thread = threading.Thread(target=self.send_test_messages, daemon=True)
+                self.test_thread.start()
+
             self.start_pipeline()
-            
+
             while not self._shutdown_requested:
                 self.process_messages()
                 time.sleep(0.1)
@@ -421,6 +398,26 @@ class FoxyWhispServer:
             except Exception as e:
                 logger.error(f"Error cleaning up queue {name}: {e}")
 
+    ####################
+    def send_test_messages(self):
+        """Send periodic test messages to GUI"""
+        counter = 0
+        while self.test_running and not self._shutdown_requested and self.queues.to_gui is not None:
+            try:
+                logger.info(f"Sending test message #{counter}")  # Добавляем лог для отладки
+                test_msg = PipelineMessage.create_log(  # Меняем на create_log
+                    source='test',
+                    message=f'Test message #{counter} from server',
+                    level='info'
+                )
+                test_msg.send(self.queues.to_gui)
+                print(f"[SERVER] Sent test message #{counter}")  # Добавляем прямой вывод
+                counter += 1
+                time.sleep(5.0)
+            except Exception as e:
+                logger.error(f"Error sending test message: {e}")
+                break
+
 ####################
 def main():
     # Настройка логирования
@@ -437,11 +434,9 @@ def main():
     args = parser.parse_args()
     
     # Запуск сервера
-    server = FoxyWhispServer(
-        # from_gui=MPQueue(),
-        # to_gui=MPQueue(),
-        args=vars(args))
-    server.start_test_messages() # Запуск тестовых сообщений
+    server = FoxyWhispServer(args=vars(args))
+    # Исправляем: вызываем правильный метод run() напрямую
+    # Тестовые сообщения запускаются внутри run()
     server.run()
 
 if __name__ == "__main__":
