@@ -123,6 +123,15 @@ class PipelineElement(ABC):
             if self._process.is_alive():
                 self._process.terminate()
 
+    # Добавляем методы для работы с процессом
+    def join(self, timeout=None):
+        if self._process:
+            self._process.join(timeout=timeout)
+
+    def is_alive(self):
+        return self._process is not None and self._process.is_alive()
+
+
 class SRCstage(PipelineElement):
     def __init__(self, stop_event, audio_out, out_queue, in_queue, args, pipe_chunk_size=320):
         super().__init__(stop_event, args, None, audio_out, in_queue, out_queue, pipe_chunk_size)
@@ -172,6 +181,7 @@ class SRCstage(PipelineElement):
             self.send_status('error', error=str(e))
         finally:
             self.send_status('stopped')
+
 
 class ASRstage(PipelineElement):
     def __init__(self, stop_event, audio_in, out_queue, in_queue, args, pipe_chunk_size=320):

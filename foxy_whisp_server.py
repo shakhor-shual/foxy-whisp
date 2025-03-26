@@ -40,47 +40,59 @@ from logic.foxy_message import PipelineMessage, MessageType
 
 logger = logging.getLogger(__name__)
 
-# class MessageType(Enum):
-#     LOG = auto()
-#     STATUS = auto()
-#     DATA = auto()
-#     COMMAND = auto()
-#     CONTROL = auto()
-
-# @dataclass
-# class PipelineMessage:
-#     source: str  # 'gui', 'src', 'asr'
-#     type: MessageType
-#     content: Any
-#     timestamp: float = field(default_factory=time.time)
-
 import signal
 import argparse
-import logging
-import sys
-from multiprocessing import Process, Queue, Event
-from typing import Optional, Dict, Any
-from logic.foxy_message import PipelineMessage, MessageType
+from multiprocessing import Process
+from multiprocessing import Queue as MPQueue 
+from multiprocessing import Event as MPEvent
+from logic.foxy_config import *
+from logic.foxy_utils import (
+    set_logging,
+    logger,
+    add_shared_args
+)
+from logic.mqtt_handler import MQTTHandler
 from logic.foxy_pipeline import SRCstage, ASRstage
-
-logger = logging.getLogger(__name__)
+from typing import Optional, Dict, Any, Tuple, Union
+from dataclasses import dataclass
+import time
+import logging
 
 class PipelineQueues:
     def __init__(self):
-        self.src_2_asr = Queue(maxsize=100)  # Аудио SRC → ASR
-        self.from_gui = Queue()  # GUI → Сервер
-        self.to_gui = Queue()    # Сервер → GUI
-        self.from_src = Queue()  # SRC → Сервер
-        self.to_src = Queue()    # Сервер → SRC
-        self.from_asr = Queue()  # ASR → Сервер
-        self.to_asr = Queue()    # Сервер → ASR
+        self.src_2_asr = MPQueue(maxsize=100)  # Аудио SRC → ASR
+        self.from_gui = MPQueue()  # GUI → Сервер
+        self.to_gui = MPQueue()    # Сервер → GUI
+        self.from_src = MPQueue()  # SRC → Сервер
+        self.to_src = MPQueue()    # Сервер → SRC
+        self.from_asr = MPQueue()  # ASR → Сервер
+        self.to_asr = MPQueue()    # Сервер → ASR
+
+class QueueHandler(logging.Handler):
+    def __init__(self, queue):
+        super().__init__()
+        self.queue = queue
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            PipelineMessage.create_log(
+                source='server',
+                message=msg,
+                level=record.levelname.lower()
+            ).send(self.queue)
+        except ValueError as e:
+            if "Queue is closed" in str(e):
+                pass  # Игнорируем ошибку закрытой очереди
+            else:
+                raise
 
 class FoxyWhispServer:
-    def __init__(self, from_gui: Optional[Queue] = None, 
-                 to_gui: Optional[Queue] = None,
+    def __init__(self, from_gui: Optional[MPQueue] = None, 
+                 to_gui: Optional[MPQueue] = None,
                  args: Optional[Dict[str, Any]] = None):
         self._shutdown_requested = False
-        self.stop_event = Event()
+        self.stop_event = MPEvent()
         self.args = args or {}
         self.pipe_chunk = self.args.get('chunk_size', 512)
         
@@ -94,9 +106,17 @@ class FoxyWhispServer:
         # Инициализация процессов
         self.processes = {'src': None, 'asr': None}
 
+        self._setup_log_redirection()
         # Обработчики сигналов
         signal.signal(signal.SIGINT, self._handle_signal)
         signal.signal(signal.SIGTERM, self._handle_signal)
+
+    def _setup_log_redirection(self):
+        """Перенаправление логов в GUI"""
+        root_logger = logging.getLogger()
+        queue_handler = QueueHandler(self.queues.to_gui)
+        queue_handler.setLevel(logging.INFO)
+        root_logger.addHandler(queue_handler)
 
     def _init_processes(self):
         """Инициализация процессов конвейера"""
@@ -185,7 +205,7 @@ class FoxyWhispServer:
 
     def start_pipeline(self):
         """Запуск конвейера обработки"""
-        if any(p.is_alive() for p in self.processes.values() if p):
+        if any(p and p.is_alive() for p in self.processes.values()):
             logger.warning("Pipeline is already running")
             return
 
@@ -253,8 +273,10 @@ class FoxyWhispServer:
         finally:
             if not self._shutdown_requested:
                 self.stop_pipeline()
+            
+            # Логируем перед очисткой
+            logger.info("Server stopping...")
             self._cleanup()
-            logger.info("Server stopped")
 
     def _handle_signal(self, signum, frame):
         """Обработчик сигналов для graceful shutdown"""
@@ -276,6 +298,13 @@ class FoxyWhispServer:
 
     def _cleanup(self):
         """Очистка ресурсов"""
+        # Сначала удаляем QueueHandler
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            if isinstance(handler, QueueHandler):
+                root_logger.removeHandler(handler)
+        
+        # Затем закрываем очереди
         for queue in vars(self.queues).values():
             try:
                 if hasattr(queue, 'close'):
@@ -301,8 +330,8 @@ def main():
     
     # Запуск сервера
     server = FoxyWhispServer(
-        from_gui=Queue(),
-        to_gui=Queue(),
+        from_gui=MPQueue(),
+        to_gui=MPQueue(),
         args=vars(args))
     server.run()
 
