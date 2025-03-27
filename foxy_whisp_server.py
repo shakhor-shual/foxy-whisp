@@ -279,7 +279,23 @@ class FoxyWhispServer:
             logger.warning("Pipeline is already running")
             return
 
+        # Проверяем что все процессы действительно остановлены
+        for name, proc in self.processes.items():
+            if proc is not None:
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=1.0)
+                if hasattr(proc, 'close'):
+                    proc.close()
+                self.processes[name] = None
+            
+        # Убеждаемся что stop_event сброшен
+        self.stop_event.clear()
+
         try:
+            # Пересоздаем Event для нового цикла
+            self.stop_event = MPEvent()
+            
             self._init_processes()
             for name, proc in self.processes.items():
                 if proc:
@@ -308,11 +324,8 @@ class FoxyWhispServer:
     ####################
     def stop_pipeline(self):
         """Остановка конвейера"""
-        if self.stop_event.is_set():
-            return
-
         logger.info("Stopping pipeline...")
-        self.stop_event.set()
+        self.stop_event.set()  # Устанавливаем событие остановки
 
         # Последовательная остановка процессов
         for name in ['asr', 'src']:  # Обратный порядок остановки
@@ -327,16 +340,42 @@ class FoxyWhispServer:
                     proc.join(timeout=2.0)
                     if proc.is_alive():
                         proc.terminate()
+                        proc.join(timeout=1.0)  # Дожидаемся завершения после terminate
                 except Exception as e:
                     logger.error(f"Error stopping {name}: {e}")
+                finally:
+                    # Важно! Очищаем все ресурсы процесса
+                    if hasattr(proc, 'close'):
+                        proc.close()
+                    self.processes[name] = None
 
+        # Очищаем все очереди
+        for queue_name in ['src_2_asr', 'from_src', 'to_src', 'from_asr', 'to_asr']:
+            queue = getattr(self.queues, queue_name)
+            while not queue.empty():
+                try:
+                    queue.get_nowait()
+                except:
+                    pass
+
+        # Отправляем статус о том что пайплайн остановлен
+        self._send_gui_message(
+            PipelineMessage.create_status(
+                source='system',
+                status='pipeline_stopped'
+            )
+        )
+        
         logger.info("Pipeline stopped")
+        # Сбрасываем stop_event для возможности последующего запуска
+        self.stop_event.clear()
 
     ####################
     def restart_pipeline(self):
         """Перезапуск конвейера"""
         self.stop_pipeline()
-        self.stop_event.clear()
+        # Нет необходимости создавать новый Event, 
+        # т.к. он уже сбрасывается в stop_pipeline
         self.start_pipeline()
 
     ####################

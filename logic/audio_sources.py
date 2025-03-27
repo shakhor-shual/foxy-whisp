@@ -41,7 +41,9 @@ class AudioDeviceSource:
         self.stop_event = stop_event or Event()  # Дефолтное значение если None
 
     def run(self):
-        if self.stop_event.is_set():
+        # Проверяем состояние stop_event перед запуском
+        if self.stop_event and self.stop_event.is_set():
+            logger.info("AudioDeviceSource: stop_event is set, not starting")
             return
             
         if self.stream:
