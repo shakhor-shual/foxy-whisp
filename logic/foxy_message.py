@@ -22,13 +22,23 @@ class PipelineMessage:
 
     @classmethod
     def create_log(cls, source: str, message: str, level: str = "info", **kwargs):
-        """Создание сообщения лога"""
+        """Создание сообщения лога с унифицированным форматированием"""
+        # Важно: всегда используем нижний регистр для source и level
+        source = source.lower().strip()
+        level = level.lower().strip()
+        
+        # Убираем лишние уровни из source, если они есть
+        if '.' in source:
+            source = source.split('.')[0]
+            
         return cls(
-            source=source.lower(),
+            source=source,
             type=MessageType.LOG,
             content={
                 'message': message,
-                'level': level.lower()
+                'level': level,
+                'raw_source': source,  # сохраняем оригинальный источник
+                'formatted': f"[{source}.{level}] {message}"
             },
             metadata=kwargs
         )

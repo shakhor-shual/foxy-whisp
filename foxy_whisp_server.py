@@ -42,15 +42,15 @@ class QueueHandler(logging.Handler):
     ####################
     def emit(self, record):
         try:
-            msg = self.format(record)
+            # Создаем сообщение с правильным форматированием
             PipelineMessage.create_log(
                 source='server',
-                message=msg,
+                message=record.getMessage(),
                 level=record.levelname.lower()
             ).send(self.queue)
         except ValueError as e:
             if "Queue is closed" in str(e):
-                pass  # Игнорируем ошибку закрытой очереди
+                pass
             else:
                 raise
 
@@ -104,13 +104,16 @@ class FoxyWhispServer:
 
     ####################
     def _send_gui_message(self, msg: PipelineMessage):
+        """Send message to GUI with proper source handling"""
         if self.queues.to_gui is not None:
+            # Convert system messages to server messages
+            if msg.source == 'system':
+                msg.source = 'server'
             try:
                 msg.send(self.queues.to_gui)
             except Exception as e:
                 logger.error(f"GUI disconnected: {e}")
                 self.queues.to_gui = None
-                # Больше не вызываем _force_shutdown при потере связи с GUI
                 self._handle_gui_disconnect()
 
     ####################
@@ -192,17 +195,24 @@ class FoxyWhispServer:
     ####################
     def _handle_log(self, msg: PipelineMessage):
         """Обработка лог-сообщения"""
+        if self.queues.to_gui is not None:
+            # Просто пересылаем сообщение в GUI без изменений
+            self._send_gui_message(msg)
+        
+        # Для локального логирования используем стандартный формат
         level = msg.content.get('level', 'info').upper()
-        message = f"[{msg.source}] {msg.content.get('message', '')}"
+        message = msg.content.get('message', '')
         logger.log(getattr(logging, level, logging.INFO), message)
 
     ####################
     def _handle_status(self, msg: PipelineMessage):
-        """Пересылка статуса в GUI (если очередь существует)"""
+        """Handle status message"""
         if self.queues.to_gui is not None:
+            # Convert system messages to server messages for status updates
+            source = 'server' if msg.source == 'system' else msg.source
             self._send_gui_message(
                 PipelineMessage.create_status(
-                    source=msg.source,
+                    source=source,
                     status=msg.content.get('status', ''),
                     **msg.content.get('details', {})
                 )

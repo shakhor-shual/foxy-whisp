@@ -9,6 +9,7 @@ from logic.foxy_utils import add_shared_args, logger
 from logic.local_audio_input import LocalAudioInput
 from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
+from logic.log_filter import LogFilter
 import queue
 
 class FoxyWhispGUI:
@@ -28,6 +29,7 @@ class FoxyWhispGUI:
         self.widgets = {}
         self.audio_input = None
         self.message_queue = queue.Queue()  # Queue for safe thread communication
+        self.log_filter = LogFilter()
 
         self.setup_gui()
         self.start_queue_listener()
@@ -190,17 +192,118 @@ class FoxyWhispGUI:
         )
         self.mute_btn.pack(side=tk.RIGHT, fill=tk.X, padx=2)
 
-        # Text display area
+        # Text display area - Create this BEFORE filter frame
         self.text = tk.Text(self.text_frame, wrap=tk.WORD, height=10)
-        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
         self.scroll = ttk.Scrollbar(
             self.text_frame,
             orient=tk.VERTICAL,
             command=self.text.yview
         )
+
+        # Add filter controls - NOW we can reference self.text
+        self.filter_frame = ttk.Frame(self.text_frame)
+        self.filter_frame.pack(fill=tk.X, pady=5)
+
+        # Source filter with tooltip
+        self.source_var = tk.StringVar(value="all")
+        sources_frame = ttk.Frame(self.filter_frame)
+        sources_frame.pack(side=tk.LEFT, padx=2)
+        
+        sources = ttk.Combobox(sources_frame, textvariable=self.source_var, 
+                             values=["all", "server", "src", "asr", "test"])
+        sources.pack(side=tk.LEFT)
+        sources.bind("<<ComboboxSelected>>", self.update_filters)
+        
+        # Добавляем подсказку для источников
+        self.create_tooltip(sources, "server: Server messages\n" +
+                                   "src: Source stage messages (srcstage)\n" +
+                                   "asr: ASR stage messages (asrstage)\n" +
+                                   "test: Test messages")
+
+        # Level filter
+        self.level_var = tk.StringVar(value="all")
+        levels = ttk.Combobox(self.filter_frame, textvariable=self.level_var,
+                            values=["all", "debug", "info", "warning", "error"])
+        levels.pack(side=tk.LEFT, padx=2)
+        levels.bind("<<ComboboxSelected>>", self.update_filters)
+
+        # Pattern filter
+        self.pattern_var = tk.StringVar()
+        pattern_entry = ttk.Entry(self.filter_frame, textvariable=self.pattern_var)
+        pattern_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        pattern_entry.bind("<Return>", self.update_filters)
+
+        # Clear filters button
+        clear_btn = ttk.Button(self.filter_frame, text="Clear Filters", 
+                             command=self.clear_filters)
+        clear_btn.pack(side=tk.RIGHT, padx=2)
+
+        # Now pack text and scrollbar AFTER filter frame
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.text.config(yscrollcommand=self.scroll.set)
+
+    def update_filters(self, event=None):
+        """Update log filters and reapply to existing text"""
+        self.log_filter.clear_all_filters()
+
+        source = self.source_var.get()
+        if source != "all":
+            self.log_filter.add_source_filter(source)
+
+        level = self.level_var.get()
+        if level != "all":
+            self.log_filter.add_level_filter(level)
+
+        pattern = self.pattern_var.get().strip()
+        if pattern:
+            self.log_filter.add_pattern_filter(pattern)
+
+        # Reapply filters to existing text
+        self.reapply_filters()
+
+    def clear_filters(self):
+        """Clear all filters and restore all text"""
+        self.source_var.set("all")
+        self.level_var.set("all")
+        self.pattern_var.set("")
+        self.log_filter.clear_all_filters()
+        self.reapply_filters()
+
+    def reapply_filters(self):
+        """Reapply filters to existing text"""
+        # Save current text
+        current_text = self.text.get(1.0, tk.END)
+        self.text.config(state=tk.NORMAL)
+        self.text.delete(1.0, tk.END)
+
+        # Reapply each line with filters
+        for line in current_text.split('\n'):
+            if line.strip():
+                try:
+                    # Parse log line
+                    parts = line.split(']', 1)
+                    if len(parts) == 2:
+                        source = parts[0].strip('[')
+                        message = parts[1].strip()
+                        level = "info"  # Default level
+                        
+                        # Нормализация source и level
+                        if '.' in source:
+                            source_parts = source.split('.')
+                            source = source_parts[0]  # Берем основной источник
+                            level = source_parts[-1].lower()  # Уровень всегда последний
+
+                        # Apply filters
+                        if self.log_filter.matches(source, level, message):
+                            self.text.insert(tk.END, line + '\n')
+                except Exception as e:
+                    print(f"[GUI] Reapply filter error: {e}")  # Для отладки
+                    # If parsing fails, just add the line
+                    self.text.insert(tk.END, line + '\n')
+
+        self.text.config(state=tk.DISABLED)
+        self.text.see(tk.END)
 
     def create_advanced_frame(self):
         """Create advanced options frame"""
@@ -359,7 +462,46 @@ class FoxyWhispGUI:
         self.root.destroy()
 
     def append_text(self, text: str):
-        """Append text to the display area"""
+        """Append text to the display area with filtering"""
+        try:
+            if text.startswith('[') and ']' in text:
+                parts = text[1:].split(']', 1)
+                if len(parts) == 2:
+                    source_level = parts[0].lower()
+                    message = parts[1].strip()
+                    
+                    # Разбор source и level
+                    if '.' in source_level:
+                        source, level = source_level.rsplit('.', 1)
+                    else:
+                        source = source_level
+                        level = 'info'
+                    
+                    # Нормализация имен источников
+                    source_mappings = {
+                        'srcstage': 'src',
+                        'asrstage': 'asr',
+                        'system': 'server'
+                    }
+                    
+                    # Преобразуем имя источника если есть в маппинге
+                    if source in source_mappings:
+                        source = source_mappings[source]
+                    
+                    print(f"[DEBUG] Processing message - Original source: '{parts[0].split('.')[0]}', "
+                          f"Normalized source: '{source}', Level: '{level}', "
+                          f"Message: '{message}', Filters: {self.log_filter.source_filters}")
+                    
+                    # Применяем фильтры с нормализованным источником
+                    if not self.log_filter.matches(source, level, message):
+                        print(f"[DEBUG] Message filtered out - {source}")
+                        return
+                    
+                    print(f"[DEBUG] Message accepted - {source}")
+            
+        except Exception as e:
+            print(f"[GUI] Message parsing error: {e}, Text: {text}")
+        
         self.text.config(state=tk.NORMAL)
         self.text.insert(tk.END, text + "\n")
         self.text.see(tk.END)
@@ -423,42 +565,64 @@ class FoxyWhispGUI:
     def handle_server_message(self, msg: PipelineMessage):
         """Handle messages from server"""
         try:
-            print(f"[GUI] Handling message type: {msg.type}")  # Отладочный вывод
+            print(f"[GUI] Processing message - Type: {msg.type}, Source: {msg.source}")
+            
             if msg.is_log():
-                message = msg.content.get('message', '')
-                self.append_text_safe(f"[{msg.source.upper()}] {message}")
-                print(f"[GUI] Log message handled: {message}")  # Отладочный вывод
+                # Используем уже отформатированное сообщение, если оно есть
+                if 'formatted' in msg.content:
+                    formatted_message = msg.content['formatted']
+                else:
+                    # Форматируем сообщение сами, если нет готового формата
+                    source = msg.source.lower()
+                    level = msg.content.get('level', 'info').lower()
+                    message = msg.content.get('message', '')
+                    formatted_message = f"[{source}.{level}] {message}"
+                
+                print(f"[GUI] Formatted log message: {formatted_message}")
+                self.append_text_safe(formatted_message)
+                
             elif msg.is_status():
                 self.handle_status_message(msg)
             elif msg.is_data():
                 self.handle_data_message(msg)
+                
         except Exception as e:
-            print(f"[GUI] Error handling message: {str(e)}")  # Отладочный вывод
-            self.append_text_safe(f"[ERROR] Failed to handle message: {str(e)}")
+            print(f"[GUI] Message handling error: {e}")
+            self.append_text_safe(f"[ERROR] Message processing failed: {e}")
 
     def handle_status_message(self, msg: PipelineMessage):
         """Handle status updates from server"""
-        status = msg.content.get('status')
-        if status == 'server_started' or status == 'pipeline_started':
-            self.server_running = True
-            self.update_button_state_safe(self.server_btn, text="Stop Server")
-            self.append_text_safe("[STATUS] Server started")
-        elif status == 'server_stopped' or status == 'server_initialized' or status == 'pipeline_stopped':
-            self.server_running = False
-            self.update_button_state_safe(self.server_btn, text="Start Server")
-            self.append_text_safe("[STATUS] Server stopped")
-        elif status == 'shutdown':
-            self.server_running = False
-            self.update_button_state_safe(self.server_btn, text="Start Server", state=tk.DISABLED)
-            self.append_text_safe("[STATUS] Server shutdown")
-        elif status == 'recording_started':
-            self.recording = True
-            self.update_button_state_safe(self.record_btn, text="Stop Recording")
-            self.append_text_safe("[STATUS] Recording started")
-        elif status == 'recording_stopped':
-            self.recording = False
-            self.update_button_state_safe(self.record_btn, text="Start Recording")
-            self.append_text_safe("[STATUS] Recording stopped")
+        try:
+            status = msg.content.get('status')
+            source = msg.source.lower()
+            # Добавляем server_ prefix для статусных сообщений от system
+            if source == 'system':
+                source = 'server'
+            
+            formatted_message = f"[{source}.{status}] {status}"
+            
+            # Обновляем состояние GUI
+            if status == 'server_started' or status == 'pipeline_started':
+                self.server_running = True
+                self.update_button_state_safe(self.server_btn, text="Stop Server")
+            elif status == 'server_stopped' or status == 'server_initialized' or status == 'pipeline_stopped':
+                self.server_running = False
+                self.update_button_state_safe(self.server_btn, text="Start Server")
+            elif status == 'shutdown':
+                self.server_running = False
+                self.update_button_state_safe(self.server_btn, text="Start Server", state=tk.DISABLED)
+            elif status == 'recording_started':
+                self.recording = True
+                self.update_button_state_safe(self.record_btn, text="Stop Recording")
+            elif status == 'recording_stopped':
+                self.recording = False
+                self.update_button_state_safe(self.record_btn, text="Start Recording")
+            
+            # Отправляем сообщение через стандартный механизм фильтрации
+            self.append_text_safe(formatted_message)
+            
+        except Exception as e:
+            print(f"[GUI] Error handling status: {e}")
 
     def handle_data_message(self, msg: PipelineMessage):
         """Handle data messages from server"""
