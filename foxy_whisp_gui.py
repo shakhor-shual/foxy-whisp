@@ -61,10 +61,10 @@ class FoxyWhispGUI:
         )
         self.server_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
 
-        # Audio source toggle
+        # Audio source toggle - изменен текст кнопки
         self.source_btn = ttk.Button(
             self.control_frame,
-            text="TCP" if self.args.listen == "tcp" else "Audio Device",
+            text="TCP" if self.args.listen == "tcp" else "Mic",
             command=self.toggle_audio_source
         )
         self.source_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
@@ -112,10 +112,32 @@ class FoxyWhispGUI:
 
     def toggle_audio_source(self):
         """Switch between TCP and Audio Device sources"""
+        # Сохраняем текущий источник для возможного отката
+        previous_source = self.args.listen
+        
+        # Переключаем источник
         self.args.listen = "audio_device" if self.args.listen == "tcp" else "tcp"
-        self.source_btn.config(text="Audio Device" if self.args.listen == "audio_device" else "TCP")
+        self.source_btn.config(text="Mic" if self.args.listen == "audio_device" else "TCP")
+        
+        # Обновляем состояние элементов управления
         self.update_controls_activity()
-        self.send_command("update_params", vars(self.args))
+        
+        # Если сервер запущен, перезапускаем источник
+        if self.server_running:
+            # Останавливаем текущий источник
+            self.send_command("stop_stage", {"stage": "src"})
+            
+            # Обновляем параметры
+            self.send_command("update_params", vars(self.args))
+            
+            # Запускаем источник с новыми параметрами
+            self.send_command("start_stage", {"stage": "src"})
+            
+            # Добавляем информацию в лог
+            self.append_text(f"[GUI.INFO] Switched audio source to {self.args.listen}")
+        else:
+            # Просто обновляем параметры если сервер не запущен
+            self.send_command("update_params", vars(self.args))
 
     def update_controls_activity(self):
         """Update controls state based on audio source"""
