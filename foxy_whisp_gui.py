@@ -6,7 +6,7 @@ from tkinter import ttk, filedialog
 import threading
 import argparse
 from logic.foxy_utils import add_shared_args, logger
-from logic.local_audio_input import LocalAudioInput
+#
 from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
 from logic.log_filter import LogFilter
@@ -94,14 +94,8 @@ class FoxyWhispGUI:
         self.advanced_btn.pack(side=tk.RIGHT, fill=tk.X, padx=5, pady=5)
 
     def update_audio_devices(self):
-        devices = LocalAudioInput.list_devices()
-        input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices if d["max_input_channels"] > 0]
-        self.device_cb["values"] = input_devices
-
-        if input_devices:
-            default_device = LocalAudioInput.get_default_input_device()
-            self.device_cb.set(f"{devices[default_device]['name']} (ID: {default_device})")
-            self.args.audio_device = default_device
+        """Request audio devices list from running SRCstage"""
+        self.send_command("get_audio_devices")
 
     def toggle_server(self):
         """Toggle server state and update UI"""
@@ -659,7 +653,18 @@ class FoxyWhispGUI:
             data_type = msg.content.get('data_type')
             payload = msg.content.get('payload')
             
-            if data_type == 'transcription':
+            if data_type == 'audio_devices':
+                # Update devices list in combobox
+                devices = payload.get('devices', [])
+                input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices]
+                self.device_cb["values"] = input_devices
+                
+                if input_devices:
+                    # Find default device
+                    default_device = next((d for d in devices if d.get('is_default')), devices[0])
+                    self.device_cb.set(f"{default_device['name']} (ID: {default_device['index']})")
+                    self.args.audio_device = default_device['index']
+            elif data_type == 'transcription':
                 self.append_text_safe(f"TRANSCRIPT: {payload}")
             elif data_type == 'audio_level':
                 print(f"[GUI.DEBUG] Received audio level: {payload}")  # Отладка

@@ -139,6 +139,7 @@ class SRCstage(PipelineElement):
         super().__init__(stop_event, args, None, audio_out, in_queue, out_queue, pipe_chunk_size)
         self.source = None
         self.vad = WebRTCVAD(aggressiveness=args.get("vad_aggressiveness", 3))
+        self.vad.connect_control(self.out_queue)  # Connect VAD to pipeline messaging
         self.fifo_buffer = AudioBuffer(sample_rate=16000, max_duration=5)
         self.vu_meter_threshold = -60  # Минимальный уровень для логирования в дБ
         self.vad_chunks_counter = 0  # Счетчик обработанных VAD чанков
@@ -147,18 +148,30 @@ class SRCstage(PipelineElement):
         self.min_level_update_interval = 0.05  # Уменьшаем минимальный интервал между обновлениями в секундах
         self.send_log("SRC stage initialized", details={"buffer_size": self.fifo_buffer.max_size})
 
+    def send_log(self, message: str, level: str = "info", **kwargs):
+        """Enhanced logging from components"""
+        msg = PipelineMessage(
+            source=self.__class__.__name__.lower(),
+            type=MessageType.LOG,
+            content={'message': message, 'level': level, **kwargs}
+        )
+        msg.send(self.out_queue)
+
     def configure(self):
         listen_type = self.args.get("listen", "tcp")
         self.send_log(f"Configuring {listen_type} source")
         
         if listen_type == "tcp":
-            self.source = TCPSource(args=self.args, stop_event=self.stop_event)
+            self.source = TCPSource(args=self.args, 
+                                  stop_event=self.stop_event,
+                                  container=self)  # Pass self as container
         elif listen_type == "audio_device":
             self.source = AudioDeviceSource(
                 samplerate=self.args.get("sample_rate", 16000),
                 blocksize=self.args.get("chunk_size", 320),
                 device=self.args.get("audio_device"),
-                stop_event=self.stop_event
+                stop_event=self.stop_event,
+                container=self  # Pass self as container
             )
         else:
             raise ValueError(f"Unknown source type: {listen_type}")
@@ -200,6 +213,11 @@ class SRCstage(PipelineElement):
             self.fifo_buffer.add_data(audio_chunk)
             vad_chunk_size = self.vad.get_chunk_size()
 
+            # Check VAD status messages and forward them
+            vad_status = self.vad.get_status()
+            if vad_status:
+                self.send_status('vad_status', **vad_status)
+
             chunks_processed = 0
             voice_chunks_detected = 0
             have_data = False
@@ -239,12 +257,16 @@ class SRCstage(PipelineElement):
                         }
                     })
 
+            # Forward level messages from source
+            if hasattr(self.source, 'last_level'):
+                self.send_data('audio_level', {'level': self.source.last_level})
+
             # Если данных больше нет в буфере, отправляем сообщение о тишине
             if not have_data:
                 self.send_level_message(0.0, is_silence=True)
 
         except Exception as e:
-            self.send_log(f"Error in process: {str(e)}", level="error")
+            self.send_log(f"Process error: {e}", level="error")
             raise
 
     def _resample_to_16k(self, audio_chunk):
@@ -260,6 +282,21 @@ class SRCstage(PipelineElement):
                              "input_size": len(audio_chunk)
                          })
         return audio_chunk.astype(np.float32)
+
+    def _handle_command(self, command: Dict[str, Any]):
+        """Handle incoming commands"""
+        cmd = command.get('command')
+        
+        if cmd == 'get_audio_devices':
+            # Get devices list from AudioDeviceSource
+            devices_info = AudioDeviceSource.get_audio_devices()
+            self.send_data('audio_devices', devices_info)
+        elif cmd == 'stop':
+            self.stop_event.set()
+        elif cmd == 'pause':
+            self.pause_event.set()
+        elif cmd == 'resume':
+            self.pause_event.clear()
 
     def _run(self):
         self.send_status('starting')

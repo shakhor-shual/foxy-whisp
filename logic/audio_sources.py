@@ -1,30 +1,17 @@
-from  logic.foxy_config import *
+from logic.foxy_config import *
+from logic.audio_utils import calculate_vu_meter
+from logic.foxy_message import PipelineMessage, MessageType
+from typing import Any, Optional  # Add this import
 import logging
 import numpy as np
-import soundfile
-import librosa
+import sounddevice as sd
 import socket
 import time
 import select
-from logic.local_audio_input import LocalAudioInput
 from logic.foxy_utils import logger, get_port_status
-
-import socket
-import logging
-import numpy as np
 from collections import deque
-
-logger = logging.getLogger(__name__)
-
-import sounddevice as sd  # Библиотека для работы с аудиоустройствами
-
-import numpy as np
-import sounddevice as sd
-from collections import deque
-import logging
-from scipy.signal import resample
-#
 from multiprocessing import Event
+from scipy.signal import resample
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +27,58 @@ class AudioDeviceSource:
         self.internal_queue = deque()
         self.stop_event = stop_event or Event()  # Default value if None
         self.container = container  # Reference to src-stage container
+        self.last_level_time = time.time()  # Initialize with current time
 
-    def log(self, level, message):
-        """Delegate logging to the container."""
+    @staticmethod
+    def list_devices():
+        """Get list of available audio input devices."""
+        devices = []
+        try:
+            device_list = sd.query_devices()
+            for i, device in enumerate(device_list):
+                if device['max_input_channels'] > 0:
+                    devices.append({
+                        'index': i,
+                        'name': device['name'],
+                        'channels': device['max_input_channels'],
+                        'default_samplerate': device['default_samplerate']
+                    })
+        except Exception as e:
+            logger.error(f"Error listing audio devices: {e}")
+        return devices
+
+    @classmethod
+    def get_audio_devices(cls):
+        """Method that can be called from SRCstage to get devices list"""
+        devices = cls.list_devices()
+        return {
+            "status": "ok",
+            "devices": devices
+        }
+
+    def log(self, level, message, **details):
+        """Enhanced logging with details support"""
         if self.container:
-            self.container.log(level, message)
+            try:
+                self.container.send_log(message, level=level.lower(), **details)
+            except Exception as e:
+                print(f"AudioSource logging error: {e}, Message: {message}")
+
+    def send_status(self, status: str, **details):
+        """Send status updates through container"""
+        if self.container:
+            try:
+                self.container.send_status(status, **details)
+            except Exception as e:
+                print(f"AudioSource status error: {e}, Status: {status}")
+
+    def send_data(self, data_type: str, data: Any, **metadata):
+        """Send data through container"""
+        if self.container:
+            try:
+                self.container.send_data(data_type, data, **metadata)
+            except Exception as e:
+                print(f"AudioSource data error: {e}, Type: {data_type}")
 
     def run(self):
         # Проверяем состояние stop_event перед запуском
@@ -59,15 +93,25 @@ class AudioDeviceSource:
         default_samplerate = int(device_info['default_samplerate'])
         self.samplerate = self.samplerate or default_samplerate
 
-        self.stream = sd.InputStream(
-            samplerate=self.samplerate,
-            blocksize=self.blocksize,
-            device=self.device,
-            channels=1,
-            dtype=np.float32,
-            callback=self.callback
-        )
-        self.stream.start()
+        try:
+            self.stream = sd.InputStream(
+                samplerate=self.samplerate,
+                blocksize=self.blocksize,
+                device=self.device,
+                channels=1,
+                dtype=np.float32,
+                callback=self.callback
+            )
+            self.stream.start()
+            self.log("info", "Audio stream started",
+                    samplerate=self.samplerate,
+                    blocksize=self.blocksize,
+                    device=self.device)
+        except Exception as e:
+            self.log("error", "Failed to start audio stream",
+                    error=str(e),
+                    device=self.device)
+            raise
 
     def stop(self):
         """Остановка захвата аудио."""
@@ -77,25 +121,41 @@ class AudioDeviceSource:
             self.stream = None
         self.log("INFO", "AudioDeviceSource stopped")
 
-    def callback(self, indata, frames, time, status):
+    def callback(self, indata, frames, time_info, status):
         """Callback-функция для обработки аудиоданных."""
         if status:
-            self.log("WARNING", f"Audio input status: {status}")
-
+            self.log("warning", "Audio callback status", 
+                    status=str(status), frames=frames)
+        
         try:
-            # Обработка данных
+            # Convert to float32 and normalize for level calculation
+            float_data = indata.astype(np.float32)
+            if float_data.ndim > 1:
+                float_data = np.mean(float_data, axis=1)
+
+            # Calculate and send level every 100ms
+            current_time = time.time()
+            if current_time - self.last_level_time >= 0.1:
+                level = calculate_vu_meter(float_data)
+                self.send_data('audio_level', {'level': level, 'timestamp': current_time})
+                self.last_level_time = current_time
+
+            # Process data for the pipeline
             processed_data = self._process_audio(indata)
-
-            # Добавление данных в буфер для накопления
             self.accumulation_buffer.extend(processed_data)
-
-            # Передача данных из буфера во внутреннюю очередь
+            
             if len(self.accumulation_buffer) >= self.accumulation_buffer.maxlen:
                 self.internal_queue.append(np.array(self.accumulation_buffer))
                 self.accumulation_buffer.clear()
+                self.log("debug", "Buffer accumulated",
+                        size=len(processed_data),
+                        queue_size=len(self.internal_queue))
 
         except Exception as e:
-            self.log("ERROR", f"Error processing audio data: {e}")
+            self.log("error", "Audio processing error",
+                    error=str(e),
+                    frames=frames,
+                    buffer_size=len(self.accumulation_buffer))
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
@@ -131,17 +191,25 @@ class TCPSource:
         self.internal_queue = deque()
         self.container = container  # Reference to src-stage container
 
-    def log(self, level, message):
-        """Delegate logging to the container."""
+    def log(self, level, message, **details):
+        """Enhanced logging with details support"""
         if self.container:
-            self.container.log(level, message)
+            if details:
+                self.container.send_log(message, level=level, **details)
+            else:
+                self.container.send_log(message, level=level)
+
+    def send_status(self, status: str, **details):
+        """Send status updates through container"""
+        if self.container:
+            self.container.send_status(status, **details)
 
     def run(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.host, self.port))
         self.socket.listen(1)
         self.socket.settimeout(1)
-        self.log("INFO", f"Listening on {self.host}:{self.port}")
+        self.log("info", f"TCP server listening", host=self.host, port=self.port)
 
         while not self.stop_event.is_set():
             try:

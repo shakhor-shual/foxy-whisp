@@ -5,6 +5,8 @@ import webrtcvad
 import torch
 from openvino.runtime import Core
 from multiprocessing import Queue
+import time
+from logic.foxy_message import PipelineMessage, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ class VADBase(ABC):
         self.control_queue = None  # Очередь для отправки статусов
         self.current_state = None  # Текущее состояние VAD (речь/тишина)
         self.audio_buffer = AudioBuffer()  # Добавляем буфер аудиоданных
+        self.last_status_time = 0
 
     def connect_input(self, input_queue):
         """Подключение входной очереди."""
@@ -63,12 +66,26 @@ class VADBase(ABC):
         """Возвращает размер чанка, необходимый для обработки."""
         pass
 
+    def send_status(self, status: str, **details):
+        """Enhanced status sending with rate limiting"""
+        current_time = time.time()
+        if current_time - self.last_status_time >= 0.1:  # Max 10 updates per second
+            if self.control_queue:
+                msg = PipelineMessage.create_status(
+                    source='vad',
+                    status=status,
+                    **details
+                )
+                msg.send(self.control_queue)
+                self.last_status_time = current_time
+
     def _update_state(self, new_state):
         """Обновление состояния VAD и отправка статуса при изменении."""
         if new_state != self.current_state:
             self.current_state = new_state
-            if self.control_queue:
-                self.control_queue.put({"vad_status": self.current_state})
+            self.send_status('state_changed', 
+                           state=new_state, 
+                           timestamp=time.time())
 
     def process(self):
         """Обработка аудиоданных из буфера."""
@@ -77,9 +94,23 @@ class VADBase(ABC):
         if audio_chunk is None:
             return None  # Недостаточно данных для обработки
 
-        voice_detected = self.detect_voice(audio_chunk)
-        self._update_state("speech" if voice_detected else "silence")
-        return audio_chunk if voice_detected else None
+        try:
+            voice_detected = self.detect_voice(audio_chunk)
+            self._update_state("speech" if voice_detected else "silence")
+            
+            # Send detailed status
+            self.send_status(
+                "processing",
+                voice_detected=voice_detected,
+                chunk_size=chunk_size,
+                buffer_size=len(self.audio_buffer.buffer)
+            )
+            
+            return audio_chunk if voice_detected else None
+            
+        except Exception as e:
+            self.send_status("error", error=str(e))
+            return None
 
     def run(self):
         """Основной цикл обработки."""
@@ -121,61 +152,45 @@ class WebRTCVAD(VADBase):
 
     def detect_voice(self, audio_chunk):
         """Анализ аудиоданных с использованием WebRTC VAD."""
-        # Преобразование данных в формат int16
-        audio_chunk = (audio_chunk * 32767).astype(np.int16)
+        try:
+            # Преобразование данных в формат int16
+            audio_chunk = (audio_chunk * 32767).astype(np.int16)
 
-        # Проверка длины данных и логирование
-        if len(audio_chunk) < self.frame_size:
-            if self.control_queue:
-                self.control_queue.put({
-                    "vad_status": "error",
-                    "details": {
-                        "error": "insufficient_data",
-                        "required_size": self.frame_size,
-                        "actual_size": len(audio_chunk)
-                    }
-                })
-            return False
-
-        # Убедимся, что длина данных кратна размеру фрейма
-        audio_chunk = audio_chunk[: len(audio_chunk) // self.frame_size * self.frame_size]
-
-        # Разделение данных на фреймы
-        frames = [
-            audio_chunk[i : i + self.frame_size]
-            for i in range(0, len(audio_chunk), self.frame_size)
-        ]
-
-        # Анализ каждого фрейма с логированием результатов
-        frame_results = []
-        for i, frame in enumerate(frames):
-            try:
-                is_speech = self.vad.is_speech(frame.tobytes(), self.sample_rate)
-                frame_results.append(is_speech)
-            except Exception as e:
-                if self.control_queue:
-                    self.control_queue.put({
-                        "vad_status": "error",
-                        "details": {
-                            "error": "frame_processing_error",
-                            "frame_index": i,
-                            "exception": str(e)
-                        }
-                    })
+            # Проверка длины данных и логирование
+            if len(audio_chunk) < self.frame_size:
+                self.send_status("error", 
+                               error="insufficient_data",
+                               required=self.frame_size,
+                               received=len(audio_chunk))
                 return False
 
-        # Отправка статистики в очередь контроля
-        if self.control_queue:
-            self.control_queue.put({
-                "vad_status": "processed",
-                "details": {
-                    "total_frames": len(frames),
-                    "speech_frames": sum(frame_results),
-                    "speech_ratio": sum(frame_results) / len(frames) if frames else 0
-                }
-            })
+            # Убедимся, что длина данных кратна размеру фрейма
+            audio_chunk = audio_chunk[: len(audio_chunk) // self.frame_size * self.frame_size]
 
-        return any(frame_results)
+            # Разделение данных на фреймы
+            frames = [
+                audio_chunk[i : i + self.frame_size]
+                for i in range(0, len(audio_chunk), self.frame_size)
+            ]
+
+            # Анализ каждого фрейма с логированием результатов
+            results = [self.vad.is_speech(frame.tobytes(), self.sample_rate) 
+                      for frame in frames]
+
+            # Send more detailed status
+            self.send_status(
+                "processing",
+                speech_detected=any(results),
+                frames_total=len(frames),
+                frames_with_speech=sum(results)
+            )
+            
+            return any(results)
+            
+        except Exception as e:
+            self.send_status("error", error=str(e))
+            return False
+
 
     def get_chunk_size(self):
         """Возвращает размер чанка для WebRTC VAD."""
