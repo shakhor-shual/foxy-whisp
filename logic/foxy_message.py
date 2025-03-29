@@ -3,6 +3,7 @@ from enum import Enum, auto
 from typing import Any, Dict, Optional
 import time
 import logging
+import os
 from multiprocessing import Queue
 
 class MessageType(Enum):
@@ -23,6 +24,11 @@ class PipelineMessage:
     @classmethod
     def create_log(cls, source: str, message: str, level: str = "info", **kwargs):
         """Создание сообщения лога с унифицированным форматированием"""
+        # Добавляем поддержку debug уровня
+        if "PYTHONDEBUGLEVEL" in os.environ:
+            if level == "debug" and os.environ["PYTHONDEBUGLEVEL"] != "1":
+                return None
+
         # Важно: всегда используем нижний регистр для source и level
         source = source.lower().strip()
         level = level.lower().strip()

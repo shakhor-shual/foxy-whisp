@@ -63,6 +63,7 @@ cover/
 
 # Django stuff:
 *.log
+!debug_*.log  # Allow debug logs
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
