@@ -17,6 +17,8 @@ class FoxyWhispGUI:
         self.gui_to_server = gui_to_server
         self.server_to_gui = server_to_gui
         self.args = args
+        # Устанавливаем микрофон как источник по умолчанию
+        self.args.listen = "audio_device"
         self.parser = parser
 
         self.root = tk.Tk()
@@ -61,10 +63,10 @@ class FoxyWhispGUI:
         )
         self.server_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
 
-        # Audio source toggle - изменен текст кнопки
+        # Audio source toggle - изменен текст кнопки и начальное состояние
         self.source_btn = ttk.Button(
             self.control_frame,
-            text="TCP" if self.args.listen == "tcp" else "Mic",
+            text="Mic" if self.args.listen == "audio_device" else "TCP",
             command=self.toggle_audio_source
         )
         self.source_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
@@ -460,9 +462,11 @@ class FoxyWhispGUI:
         if self.recording:
             self.send_command("stop_recording")
             self.record_btn.config(text="Start Recording")
+            print("[GUI.DEBUG] Stopping recording")  # Отладка
         else:
             self.send_command("start_recording")
             self.record_btn.config(text="Stop Recording")
+            print("[GUI.DEBUG] Starting recording")  # Отладка
         self.recording = not self.recording
 
     def toggle_advanced(self):
@@ -651,15 +655,21 @@ class FoxyWhispGUI:
 
     def handle_data_message(self, msg: PipelineMessage):
         """Handle data messages from server"""
-        data_type = msg.content.get('data_type')
-        payload = msg.content.get('payload')
-        
-        if data_type == 'transcription':
-            self.append_text_safe(f"TRANSCRIPT: {payload}")
-        elif data_type == 'audio_level':
-            self.update_audio_level_safe(payload)
-        elif data_type == 'log':  # Добавляем обработку тестовых лог-сообщений
-            self.append_text_safe(f"TEST: {payload}")
+        try:
+            data_type = msg.content.get('data_type')
+            payload = msg.content.get('payload')
+            
+            if data_type == 'transcription':
+                self.append_text_safe(f"TRANSCRIPT: {payload}")
+            elif data_type == 'audio_level':
+                print(f"[GUI.DEBUG] Received audio level: {payload}")  # Отладка
+                self.update_audio_level_safe(payload)
+            elif data_type == 'log':
+                self.append_text_safe(f"TEST: {payload}")
+                
+        except Exception as e:
+            print(f"[GUI.ERROR] Data message handling error: {e}")
+            self.append_text_safe(f"[ERROR] Data handling error: {e}")
 
     def update_audio_level_safe(self, level):
         """Thread-safe version of update_audio_level"""
