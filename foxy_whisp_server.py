@@ -159,7 +159,7 @@ class FoxyWhispServer:
         """Инициализация процессов конвейера"""
         self.processes['src'] = SRCstage(
             stop_event=self.stop_event,
-            audio_out=self.queues.src_2_asr,
+            audio_out=self.queues.src_2_asr,  # Передача данных на следующий этап
             out_queue=self.queues.from_src,
             in_queue=self.queues.to_src,
             args=self.args,
@@ -168,7 +168,7 @@ class FoxyWhispServer:
         
         self.processes['asr'] = ASRstage(
             stop_event=self.stop_event,
-            audio_in=self.queues.src_2_asr,
+            audio_in=self.queues.src_2_asr,  # Получение данных от предыдущего этапа
             out_queue=self.queues.from_asr,
             in_queue=self.queues.to_asr,
             args=self.args,
@@ -287,9 +287,19 @@ class FoxyWhispServer:
         """Запуск конвейера обработки"""
         if any(p and p.is_alive() for p in self.processes.values()):
             logger.warning("Pipeline is already running")
+            self._send_gui_message(
+                PipelineMessage.create_status(
+                    source='system',
+                    status='pipeline_error',
+                    details={'error': 'Pipeline is already running'}
+                )
+            )
             return
 
-        # Проверяем что все процессы действительно остановлены
+        # Ensure clean state
+        self.stop_event.clear()
+        
+        # Clear old processes
         for name, proc in self.processes.items():
             if proc is not None:
                 if proc.is_alive():
@@ -298,36 +308,39 @@ class FoxyWhispServer:
                 if hasattr(proc, 'close'):
                     proc.close()
                 self.processes[name] = None
-            
-        # Убеждаемся что stop_event сброшен
-        self.stop_event.clear()
 
         try:
-            # Пересоздаем Event для нового цикла
-            self.stop_event = MPEvent()
-            
             self._init_processes()
+            
+            # Start processes sequentially with status checks
             for name, proc in self.processes.items():
                 if proc:
                     proc.start()
-                    logger.info(f"Started {name} process")
-            
-            # Отправляем статус о запуске
+                    time.sleep(0.5)  # Give time to initialize
+                    if not proc.is_alive():
+                        raise RuntimeError(f"Failed to start {name} process")
+                    pid = proc.pid if hasattr(proc, 'pid') else 'unknown'
+                    logger.info(f"Started {name} process (PID: {pid})")
+
+            # Send explicit status update
             self._send_gui_message(
                 PipelineMessage.create_status(
                     source='system',
-                    status='pipeline_started'
+                    status='pipeline_started',
+                    details={'state': 'running'}
                 )
             )
             logger.info("Pipeline started successfully")
 
         except Exception as e:
-            logger.error(f"Failed to start pipeline: {e}")
+            error_msg = str(e)
+            logger.error(f"Failed to start pipeline: {error_msg}")
+            self.stop_pipeline()  # Ensure cleanup
             self._send_gui_message(
                 PipelineMessage.create_status(
                     source='system',
                     status='pipeline_error',
-                    error=str(e)
+                    details={'error': error_msg}
                 )
             )
 
@@ -335,50 +348,68 @@ class FoxyWhispServer:
     def stop_pipeline(self):
         """Остановка конвейера"""
         logger.info("Stopping pipeline...")
-        self.stop_event.set()  # Устанавливаем событие остановки
+        
+        # Set stop event first
+        self.stop_event.set()
+        
+        # Send initial stopping status
+        self._send_gui_message(
+            PipelineMessage.create_status(
+                source='system',
+                status='pipeline_stopping'
+            )
+        )
+
+        time.sleep(0.1)  # Даем время на обработку события
 
         # Последовательная остановка процессов
         for name in ['asr', 'src']:  # Обратный порядок остановки
             if proc := self.processes.get(name):
                 try:
-                    # Отправляем команду на остановку
+                    # Отправляем команду остановки
                     PipelineMessage.create_command(
                         source='server',
                         command='stop'
                     ).send(getattr(self.queues, f'to_{name}'))
                     
+                    # Даем время на graceful shutdown
                     proc.join(timeout=2.0)
+                    
                     if proc.is_alive():
+                        logger.warning(f"Force terminating {name} process")
                         proc.terminate()
-                        proc.join(timeout=1.0)  # Дожидаемся завершения после terminate
-                except Exception as e:
-                    logger.error(f"Error stopping {name}: {e}")
-                finally:
-                    # Важно! Очищаем все ресурсы процесса
+                        proc.join(timeout=1.0)
+                    
+                    if proc.is_alive():
+                        logger.error(f"Failed to stop {name} process")
+                        continue
+                        
                     if hasattr(proc, 'close'):
                         proc.close()
                     self.processes[name] = None
+                    
+                except Exception as e:
+                    logger.error(f"Error stopping {name}: {e}")
 
         # Очищаем все очереди
         for queue_name in ['src_2_asr', 'from_src', 'to_src', 'from_asr', 'to_asr']:
             queue = getattr(self.queues, queue_name)
-            while not queue.empty():
-                try:
+            try:
+                while not queue.empty():
                     queue.get_nowait()
-                except:
-                    pass
+            except:
+                pass
 
-        # Отправляем статус о том что пайплайн остановлен
+        # Always send final stopped status
         self._send_gui_message(
             PipelineMessage.create_status(
                 source='system',
-                status='pipeline_stopped'
+                status='pipeline_stopped',
+                details={'state': 'stopped'}
             )
         )
         
         logger.info("Pipeline stopped")
-        # Сбрасываем stop_event для возможности последующего запуска
-        self.stop_event.clear()
 
     ####################
     def restart_pipeline(self):

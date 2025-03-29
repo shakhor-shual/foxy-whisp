@@ -31,19 +31,25 @@ logger = logging.getLogger(__name__)
 ###################################################################
 class AudioDeviceSource:
     def __init__(self, samplerate=None, blocksize=32768, device=None, 
-                 accumulation_buffer_size=1, stop_event=None):
+                 accumulation_buffer_size=1, stop_event=None, container=None):
         self.samplerate = samplerate
         self.blocksize = blocksize
         self.device = device
         self.stream = None
         self.accumulation_buffer = deque(maxlen=int(16000 * accumulation_buffer_size))
         self.internal_queue = deque()
-        self.stop_event = stop_event or Event()  # Дефолтное значение если None
+        self.stop_event = stop_event or Event()  # Default value if None
+        self.container = container  # Reference to src-stage container
+
+    def log(self, level, message):
+        """Delegate logging to the container."""
+        if self.container:
+            self.container.log(level, message)
 
     def run(self):
         # Проверяем состояние stop_event перед запуском
         if self.stop_event and self.stop_event.is_set():
-            logger.info("AudioDeviceSource: stop_event is set, not starting")
+            self.log("INFO", "AudioDeviceSource: stop_event is set, not starting")
             return
             
         if self.stream:
@@ -69,11 +75,12 @@ class AudioDeviceSource:
             self.stream.stop()
             self.stream.close()
             self.stream = None
+        self.log("INFO", "AudioDeviceSource stopped")
 
     def callback(self, indata, frames, time, status):
         """Callback-функция для обработки аудиоданных."""
         if status:
-            logger.warning(f"Audio input status: {status}")
+            self.log("WARNING", f"Audio input status: {status}")
 
         try:
             # Обработка данных
@@ -88,7 +95,7 @@ class AudioDeviceSource:
                 self.accumulation_buffer.clear()
 
         except Exception as e:
-            logger.error(f"Error processing audio data: {e}")
+            self.log("ERROR", f"Error processing audio data: {e}")
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
@@ -112,28 +119,34 @@ class AudioDeviceSource:
 
 ##################################################################
 class TCPSource:
-    def __init__(self, args, stop_event=None):
+    def __init__(self, args, stop_event=None, container=None):
         self.args = args
         self.host = args.get("host", "0.0.0.0")
         self.port = args.get("port", 43007)
         self.socket = None
         self.connection = None
-        self.stop_event = stop_event or Event()  # Дефолтное значение если None
+        self.stop_event = stop_event or Event()  # Default value if None
         self.chunk_size = args.get("chunk_size", 320)
         self.sample_width = 2
         self.internal_queue = deque()
+        self.container = container  # Reference to src-stage container
+
+    def log(self, level, message):
+        """Delegate logging to the container."""
+        if self.container:
+            self.container.log(level, message)
 
     def run(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.host, self.port))
         self.socket.listen(1)
         self.socket.settimeout(1)
-        logger.info(f"Listening on {self.host}:{self.port}")
+        self.log("INFO", f"Listening on {self.host}:{self.port}")
 
         while not self.stop_event.is_set():
             try:
                 self.connection, addr = self.socket.accept()
-                logger.info(f"Connected to client on {addr}")
+                self.log("INFO", f"Connected to client on {addr}")
 
                 while not self.stop_event.is_set():
                     try:
@@ -145,22 +158,22 @@ class TCPSource:
                     except socket.timeout:
                         continue
                     except BrokenPipeError:
-                        logger.error("Client disconnected unexpectedly.")
+                        self.log("ERROR", "Client disconnected unexpectedly.")
                         break
                     except Exception as e:
-                        logger.error(f"Error receiving audio data: {e}")
+                        self.log("ERROR", f"Error receiving audio data: {e}")
                         break
 
                 self.connection.close()
-                logger.info("Connection to client closed")
+                self.log("INFO", "Connection to client closed")
 
             except socket.timeout:
                 continue
             except Exception as e:
-                logger.error(f"Error in server loop: {e}")
+                self.log("ERROR", f"Error in server loop: {e}")
                 break
 
-        logger.info("TCP server stopped")
+        self.log("INFO", "TCP server stopped")
 
 
     def _non_blocking_receive_audio(self):
@@ -190,7 +203,7 @@ class TCPSource:
             self.connection.close()
         if self.socket:
             self.socket.close()
-        logger.info("TCP server resources released")
+        self.log("INFO", "TCP server resources released")
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""

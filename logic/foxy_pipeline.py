@@ -3,11 +3,14 @@ from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
 import time
 from logic.audio_sources import AudioDeviceSource, TCPSource
-from logic.vad_filters import VADBase, create_vad
+from logic.vad_filters import VADBase, create_vad, WebRTCVAD, AudioBuffer
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from logic.foxy_message import PipelineMessage, MessageType
+from scipy.signal import resample_poly
+import numpy as np
+from logic.audio_utils import calculate_vu_meter
 
 
 class PipelineElement(ABC):
@@ -76,7 +79,7 @@ class PipelineElement(ABC):
         return None
 
     def audio_write(self, data: bytes):
-        if self.audio_out and data:
+        if self.audio_out and data is not None and data.size > 0:
             self.audio_out.put(data)
 
     @abstractmethod
@@ -123,7 +126,6 @@ class PipelineElement(ABC):
             if self._process.is_alive():
                 self._process.terminate()
 
-    # Добавляем методы для работы с процессом
     def join(self, timeout=None):
         if self._process:
             self._process.join(timeout=timeout)
@@ -136,7 +138,14 @@ class SRCstage(PipelineElement):
     def __init__(self, stop_event, audio_out, out_queue, in_queue, args, pipe_chunk_size=320):
         super().__init__(stop_event, args, None, audio_out, in_queue, out_queue, pipe_chunk_size)
         self.source = None
-        self.send_log("SRC stage initialized")
+        self.vad = WebRTCVAD(aggressiveness=args.get("vad_aggressiveness", 3))
+        self.fifo_buffer = AudioBuffer(sample_rate=16000, max_duration=5)
+        self.vu_meter_threshold = -60  # Минимальный уровень для логирования в дБ
+        self.vad_chunks_counter = 0  # Счетчик обработанных VAD чанков
+        self.vu_meter_update_interval = 3  # Уменьшаем интервал обновления
+        self.last_level_msg_time = 0  # Время последней отправки уровня
+        self.min_level_update_interval = 0.05  # Уменьшаем минимальный интервал между обновлениями в секундах
+        self.send_log("SRC stage initialized", details={"buffer_size": self.fifo_buffer.max_size})
 
     def configure(self):
         listen_type = self.args.get("listen", "tcp")
@@ -156,30 +165,128 @@ class SRCstage(PipelineElement):
         
         self.send_status('configured')
 
+    def send_level_message(self, level: int, is_silence: bool = False):
+        """Отправка сообщения об уровне сигнала"""
+        current_time = time.time()
+        if current_time - self.last_level_msg_time >= self.min_level_update_interval:
+            message = {
+                'data_type': 'audio_level',
+                'payload': {
+                    'level': 0 if is_silence else level,
+                    'timestamp': current_time,
+                    'is_silence': is_silence
+                }
+            }
+            if self.out_queue:
+                self.out_queue.put(message)
+            self.last_level_msg_time = current_time
+
     def process(self, audio_chunk):
-        return audio_chunk  # SRC просто передает аудио дальше
+        """Добавление данных в FIFO буфер и обработка через VAD."""
+        try:
+            # Сначала нормализуем входные данные до диапазона [-1, 1]
+            if audio_chunk.dtype != np.float32:
+                audio_chunk = audio_chunk.astype(np.float32)
+            if np.max(np.abs(audio_chunk)) > 1.0:
+                audio_chunk = audio_chunk / 32768.0  # нормализация из int16
+
+            # Измеряем уровень входного сигнала
+            level = calculate_vu_meter(audio_chunk)
+
+            # Ресэмплинг аудиоданных до 16 кГц
+            audio_chunk = self._resample_to_16k(audio_chunk)
+
+            # Добавление данных в буфер
+            self.fifo_buffer.add_data(audio_chunk)
+            vad_chunk_size = self.vad.get_chunk_size()
+
+            chunks_processed = 0
+            voice_chunks_detected = 0
+            have_data = False
+
+            while True:
+                chunk = self.fifo_buffer.get_chunk(vad_chunk_size)
+                if chunk is None:
+                    if not have_data:
+                        # Если не смогли получить ни одного чанка, отправляем нулевой уровень
+                        self.send_level_message(0.0, is_silence=True)
+                    break
+
+                have_data = True
+                chunks_processed += 1
+                self.vad_chunks_counter += 1
+                
+                # Измеряем уровень каждого чанка
+                chunk_level = calculate_vu_meter(chunk)
+                
+                # Отправляем информацию об уровне чаще
+                if self.vad_chunks_counter % self.vu_meter_update_interval == 0:
+                    self.send_level_message(chunk_level)
+
+                # Проверка на голос
+                if self.vad.detect_voice(chunk):
+                    voice_chunks_detected += 1
+                    self.audio_write(chunk)
+                    
+                    # Статистика только для голосовых чанков
+                    self.send_data('audio_chunk', {
+                        'size': len(chunk),
+                        'voice_detected': True,
+                        'stats': {
+                            'total_chunks': chunks_processed,
+                            'voice_chunks': voice_chunks_detected,
+                            'level': float(chunk_level)
+                        }
+                    })
+
+            # Если данных больше нет в буфере, отправляем сообщение о тишине
+            if not have_data:
+                self.send_level_message(0.0, is_silence=True)
+
+        except Exception as e:
+            self.send_log(f"Error in process: {str(e)}", level="error")
+            raise
+
+    def _resample_to_16k(self, audio_chunk):
+        """Ресэмплинг аудиоданных до 16 кГц и одного канала."""
+        input_sample_rate = self.args.get("sample_rate", 16000)
+        if input_sample_rate != 16000:
+            # Выполняем ресэмплинг
+            audio_chunk = resample_poly(audio_chunk, 16000, input_sample_rate)
+            self.send_log("Performed resampling", level="debug", 
+                         details={
+                             "from_rate": input_sample_rate,
+                             "to_rate": 16000,
+                             "input_size": len(audio_chunk)
+                         })
+        return audio_chunk.astype(np.float32)
 
     def _run(self):
         self.send_status('starting')
         try:
             self.configure()
+            self.send_log("SRC stage configured and running", level="info")
             while not self.stop_event.is_set():
                 self.process_control_commands()
                 
                 if self.pause_event.is_set():
+                    self.send_log("Processing paused", level="debug")
                     time.sleep(0.1)
                     continue
 
                 if audio_data := self.source.receive_audio():
-                    self.audio_write(audio_data)
-                    self.send_data('audio_chunk', {'size': len(audio_data)})
+                    self.send_log("Received audio data", level="debug", 
+                                details={"data_size": len(audio_data)})
+                    self.process(audio_data)
                 else:
                     time.sleep(0.01)
                     
         except Exception as e:
-            self.send_log(f"SRC error: {str(e)}", level="error")
+            self.send_log(f"SRC error: {str(e)}", level="error", 
+                         details={"exception_type": type(e).__name__})
             self.send_status('error', error=str(e))
         finally:
+            self.send_log("SRC stage stopping", level="info")
             self.send_status('stopped')
 
 
@@ -201,7 +308,8 @@ class ASRstage(PipelineElement):
     def process(self, audio_chunk):
         self.chunk_counter += 1
         
-        if self.chunk_counter % 50 == 0:  # Каждые 50 чанков
+        # Уменьшаем интервал с 50 до 10 чанков
+        if self.chunk_counter % 10 == 0:  # Каждые 10 чанков
             phrase = self.test_phrases[self.chunk_counter % len(self.test_phrases)]
             self.text_buffer += phrase + " "
             self.send_data('asr_result', {

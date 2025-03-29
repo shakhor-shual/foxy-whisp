@@ -105,10 +105,10 @@ class FoxyWhispGUI:
         """Toggle server state and update UI"""
         if self.server_running:
             self.send_command("stop")
-            # Не меняем текст кнопки здесь - дождемся ответа от сервера
         else:
+            # Временно отключаем кнопку до получения ответа
+            self.server_btn.configure(state='disabled')
             self.send_command("start", vars(self.args))
-            # Не меняем текст кнопки здесь - дождемся ответа от сервера
 
     def toggle_audio_source(self):
         """Switch between TCP and Audio Device sources"""
@@ -593,36 +593,39 @@ class FoxyWhispGUI:
     def handle_status_message(self, msg: PipelineMessage):
         """Handle status updates from server"""
         try:
-            status = msg.content.get('status')
+            status = msg.content.get('status', '')
             source = msg.source.lower()
-            # Добавляем server_ prefix для статусных сообщений от system
+            details = msg.content.get('details', {})
+            
+            # Convert system source to server
             if source == 'system':
                 source = 'server'
-            
-            formatted_message = f"[{source}.{status}] {status}"
-            
-            # Обновляем состояние GUI
-            if status == 'server_started' or status == 'pipeline_started':
+                
+            # Update GUI state based on status
+            if status == 'server_initialized':
+                self.server_running = False
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Start Server"})))
+            elif status == 'pipeline_started':
                 self.server_running = True
-                self.update_button_state_safe(self.server_btn, text="Stop Server")
-            elif status == 'server_stopped' or status == 'server_initialized' or status == 'pipeline_stopped':
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Stop Server"})))
+            elif status in ('pipeline_stopped', 'pipeline_error', 'shutdown'):
                 self.server_running = False
-                self.update_button_state_safe(self.server_btn, text="Start Server")
-            elif status == 'shutdown':
-                self.server_running = False
-                self.update_button_state_safe(self.server_btn, text="Start Server", state=tk.DISABLED)
-            elif status == 'recording_started':
-                self.recording = True
-                self.update_button_state_safe(self.record_btn, text="Stop Recording")
-            elif status == 'recording_stopped':
-                self.recording = False
-                self.update_button_state_safe(self.record_btn, text="Start Recording")
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Start Server"})))
+                if self.recording:
+                    self.recording = False
+                    self.message_queue.put(('update_button', (self.record_btn, {'text': "Start Recording"})))
             
-            # Отправляем сообщение через стандартный механизм фильтрации
-            self.append_text_safe(formatted_message)
+            # Send formatted message with details
+            formatted_msg = f"[{source}.{status}] {status}"
+            if isinstance(details, dict):
+                detail_str = ', '.join(f"{k}={v}" for k, v in details.items())
+                if detail_str:
+                    formatted_msg += f" ({detail_str})"
+            self.append_text_safe(formatted_msg)
             
         except Exception as e:
-            print(f"[GUI] Error handling status: {e}")
+            logger.error(f"Error handling status: {e}")
+            self.append_text_safe(f"[ERROR] Status handling error: {e}")
 
     def handle_data_message(self, msg: PipelineMessage):
         """Handle data messages from server"""
@@ -647,24 +650,25 @@ class FoxyWhispGUI:
     def process_message_queue(self):
         """Process pending messages in the queue"""
         try:
-            while True:  # Process all pending messages
-                message = self.message_queue.get_nowait()
-                if isinstance(message, tuple):
-                    action, args = message
-                    if action == 'append_text':
-                        self.append_text(args)
-                    elif action == 'update_audio':
-                        self.update_audio_level(args)
-                    elif action == 'update_button':
-                        button, kwargs = args
-                        button.config(**kwargs)
-                self.message_queue.task_done()
-        except queue.Empty:
-            pass
+            while True:
+                try:
+                    message = self.message_queue.get_nowait()
+                    if isinstance(message, tuple):
+                        action, args = message
+                        if action == 'append_text':
+                            self.append_text(args)
+                        elif action == 'update_audio':
+                            self.update_audio_level(args)
+                        elif action == 'update_button':
+                            button, kwargs = args
+                            button.configure(**kwargs)
+                            self.root.update()  # Force immediate update
+                    self.message_queue.task_done()
+                except queue.Empty:
+                    break
         finally:
-            # Schedule next check
             if self.root:
-                self.root.after(100, self.process_message_queue)
+                self.root.after(10, self.process_message_queue)  # Faster updates
 
     def run(self):
         """Run the GUI main loop"""
