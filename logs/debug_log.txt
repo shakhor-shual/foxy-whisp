@@ -1,10 +1,10 @@
-=== New Session Сб 29 мар 2025 17:29:29 CET ===
+=== New Session Сб 29 мар 2025 18:14:51 CET ===
 Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 /home/ubuntu/foxy-whisp/logic/foxy_whisp_gui.py
 [SERVER] Sent test message #0
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743265772.4436712, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743268493.9262917, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #0 from server'}, 'timestamp': 1743265772.445081, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #0 from server'}, 'timestamp': 1743268493.927728, 'metadata': {}}
 [GUI] Test message received: Test message #0 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #0 from server
@@ -12,49 +12,49 @@ Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 [DEBUG] Message accepted - server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #0 from server', Filters: set()
 [DEBUG] Message accepted - test
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743265773.4697225, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743268494.9556181, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743265772.4465716, 'metadata': {}}
-[SERVER] Processing message from src: MessageType.LOG[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
-
+[SERVER] Processing message from src: MessageType.LOG
+[SERVER] Processing message from src: MessageType.LOG
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743268493.9293044, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
 [GUI] Formatted log message: [srcstage.info] SRC stage initialized
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 423944)', 'level': 'info'}, 'timestamp': 1743265772.4558244, 'metadata': {}}
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 510918)', 'level': 'info'}, 'timestamp': 1743268493.9387283, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: srcstage
-[GUI] Formatted log message: [srcstage.info] Process started (PID: 423944)
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743265773.470998, 'metadata': {}}[SERVER] Processing message from src: MessageType.LOG
+[GUI] Formatted log message: [srcstage.info] Process started (PID: 510918)
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268494.9571946, 'metadata': {}}
+[SERVER] Processing message from src: MessageType.LOG[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
 
-[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring tcp source', 'level': 'info'}, 'timestamp': 1743265772.4581058, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring tcp source', 'level': 'info'}, 'timestamp': 1743268493.9408553, 'metadata': {}}
+[SERVER] Processing message from src: MessageType.STATUS[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+
 [GUI] Formatted log message: [srcstage.info] Configuring tcp source
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743265773.4712942, 'metadata': {}}[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268494.957455, 'metadata': {}}[SERVER] Processing message from src: MessageType.LOG
 
 [GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
 [SERVER] Processing message from asr: MessageType.LOG
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743265772.4587774, 'metadata': {}}
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743268493.9413474, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: srcstage
 [GUI] Formatted log message: [srcstage.info] SRC stage configured and running
-[SERVER] Processing message from asr: MessageType.LOG[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743265772.4473922, 'metadata': {}}
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743268493.9300804, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.LOG[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
 
-[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
 [GUI] Formatted log message: [asrstage.info] ASR stage initialized
-[SERVER] Processing message from asr: MessageType.STATUS
-[SERVER] Processing message from asr: MessageType.STATUS
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 423949)', 'level': 'info'}, 'timestamp': 1743265772.9693007, 'metadata': {}}
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 510923)', 'level': 'info'}, 'timestamp': 1743268494.4551566, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: asrstage
-[GUI] Formatted log message: [asrstage.info] Process started (PID: 423949)
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743265773.4718971, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743265773.472078, 'metadata': {}}
+[GUI] Formatted log message: [asrstage.info] Process started (PID: 510923)
+[SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268494.9580817, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.STATUS[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
+
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268494.95825, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
 [DEBUG] Message accepted - server
 [DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
 [DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 423944)', Filters: set()
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 510918)', Filters: set()
 [DEBUG] Message accepted - src
 [DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
 [DEBUG] Message accepted - src
@@ -66,7 +66,7 @@ Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 [DEBUG] Message accepted - src
 [DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
 [DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 423949)', Filters: set()
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 510923)', Filters: set()
 [DEBUG] Message accepted - asr
 [DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
 [DEBUG] Message accepted - asr
@@ -74,82 +74,279 @@ Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 [DEBUG] Message accepted - asr
 [SERVER] Processing message from GUI: MessageType.COMMAND
 [SERVER] Received command: stop
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743265775.9775248, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743268497.6639497, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopping', Message: 'pipeline_stopping', Filters: set()
 [DEBUG] Message accepted - server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743265776.0814292, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743268497.7844942, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopped', Message: 'pipeline_stopped (details={'state': 'stopped'})', Filters: set()
 [DEBUG] Message accepted - server
 [SERVER] Sent test message #1
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #1 from server'}, 'timestamp': 1743265777.4469898, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #1 from server'}, 'timestamp': 1743268498.9296832, 'metadata': {}}
 [GUI] Test message received: Test message #1 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #1 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #1 from server', Filters: set()
 [DEBUG] Message accepted - test
 [SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: update_params
+[SERVER] Received command: start
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743268502.0276024, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743268500.9922495, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] SRC stage initialized
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 511160)', 'level': 'info'}, 'timestamp': 1743268501.010263, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] Process started (PID: 511160)
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268502.0289135, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring tcp source', 'level': 'info'}, 'timestamp': 1743268501.0119278, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] Configuring tcp source
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268502.0293472, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743268501.0126438, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] SRC stage configured and running[SERVER] Processing message from asr: MessageType.LOG
+
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743268500.9928372, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.LOG
+[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
+[GUI] Formatted log message: [asrstage.info] ASR stage initialized
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 511190)', 'level': 'info'}, 'timestamp': 1743268501.527153, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.STATUS[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
+
+[GUI] Formatted log message: [asrstage.info] Process started (PID: 511190)
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268502.0300145, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
+[SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268502.030207, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
+[DEBUG] Message accepted - server
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 511160)', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Configuring tcp source', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage configured and running', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 511190)', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - asr
 [SERVER] Sent test message #2
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #2 from server'}, 'timestamp': 1743265782.4472563, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #2 from server'}, 'timestamp': 1743268503.9300587, 'metadata': {}}
 [GUI] Test message received: Test message #2 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #2 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #2 from server', Filters: set()
 [DEBUG] Message accepted - test
 [SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: start
+[SERVER] Received command: stop
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743268507.0409405, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopping', Message: 'pipeline_stopping', Filters: set()
+[DEBUG] Message accepted - server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743268507.1424165, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopped', Message: 'pipeline_stopped (details={'state': 'stopped'})', Filters: set()
+[DEBUG] Message accepted - server
 [SERVER] Sent test message #3
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #3 from server'}, 'timestamp': 1743265787.447596, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #3 from server'}, 'timestamp': 1743268508.930492, 'metadata': {}}
 [GUI] Test message received: Test message #3 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #3 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #3 from server', Filters: set()
 [DEBUG] Message accepted - test
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: start
+[SERVER] Sent test message #4
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #4 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #4 from server'}, 'timestamp': 1743268513.9308572, 'metadata': {}}
+[GUI] Test message received: Test message #4 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #4 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #4 from server', Filters: set()
+[DEBUG] Message accepted - test
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743265788.0391603, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743268514.7928941, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743265787.0047793, 'metadata': {}}
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743268513.7573514, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: srcstage
 [GUI] Formatted log message: [srcstage.info] SRC stage initialized
-[SERVER] Processing message from src: MessageType.LOG
 [SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 424334)', 'level': 'info'}, 'timestamp': 1743265787.0225804, 'metadata': {}}
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 511544)', 'level': 'info'}, 'timestamp': 1743268513.7756367, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: srcstage
-[GUI] Formatted log message: [srcstage.info] Process started (PID: 424334)
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743265788.0406651, 'metadata': {}}
+[GUI] Formatted log message: [srcstage.info] Process started (PID: 511544)
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268514.7941658, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage[SERVER] Processing message from src: MessageType.LOG
+
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring tcp source', 'level': 'info'}, 'timestamp': 1743268513.777312, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] Configuring tcp source
+[SERVER] Processing message from src: MessageType.LOG[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268514.7944784, 'metadata': {}}
+
 [GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info'}, 'timestamp': 1743265787.0249603, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743268513.7778711, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: srcstage
-[SERVER] Processing message from src: MessageType.STATUS[GUI] Formatted log message: [srcstage.info] Configuring audio_device source
-
-[SERVER] Processing message from src: MessageType.LOG[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743265788.0410647, 'metadata': {}}
-
-[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
-[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743265787.025583, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
-[SERVER] Processing message from asr: MessageType.LOG[GUI] Formatted log message: [srcstage.info] SRC stage configured and running
-
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743265787.0053728, 'metadata': {}}
+[GUI] Formatted log message: [srcstage.info] SRC stage configured and running
+[SERVER] Processing message from asr: MessageType.LOG
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743268513.7579215, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: asrstage
 [GUI] Formatted log message: [asrstage.info] ASR stage initialized
-[SERVER] Processing message from asr: MessageType.LOG
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 424355)', 'level': 'info'}, 'timestamp': 1743265787.538697, 'metadata': {}}
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 511563)', 'level': 'info'}, 'timestamp': 1743268514.2924685, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.LOG, Source: asrstage
-[GUI] Formatted log message: [asrstage.info] Process started (PID: 424355)
+[GUI] Formatted log message: [asrstage.info] Process started (PID: 511563)
 [SERVER] Processing message from asr: MessageType.STATUS
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743265788.0418403, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268514.7951422, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
-[SERVER] Processing message from asr: MessageType.STATUS
-[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743265788.042017, 'metadata': {}}
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268514.7953088, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
 [DEBUG] Message accepted - server
 [DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
 [DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 424334)', Filters: set()
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 511544)', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Configuring tcp source', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage configured and running', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 511563)', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - asr
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - asr
+[SERVER] Sent test message #5
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #5 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #5 from server'}, 'timestamp': 1743268518.9312463, 'metadata': {}}
+[GUI] Test message received: Test message #5 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #5 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #5 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: update_params
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: update_params
+[SERVER] Sent test message #6
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #6 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #6 from server'}, 'timestamp': 1743268523.931455, 'metadata': {}}
+[GUI] Test message received: Test message #6 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #6 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #6 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Sent test message #7
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #7 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #7 from server'}, 'timestamp': 1743268528.9316714, 'metadata': {}}
+[GUI] Test message received: Test message #7 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #7 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #7 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Sent test message #8
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #8 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #8 from server'}, 'timestamp': 1743268533.9318888, 'metadata': {}}
+[GUI] Test message received: Test message #8 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #8 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #8 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Sent test message #9
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #9 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #9 from server'}, 'timestamp': 1743268538.9321089, 'metadata': {}}
+[GUI] Test message received: Test message #9 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #9 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #9 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: update_params
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: stop
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743268540.7473383, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopping', Message: 'pipeline_stopping', Filters: set()
+[DEBUG] Message accepted - server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743268540.848375, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopped', Message: 'pipeline_stopped (details={'state': 'stopped'})', Filters: set()
+[DEBUG] Message accepted - server
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: start
+[SERVER] Sent test message #10
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #10 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #10 from server'}, 'timestamp': 1743268543.9324896, 'metadata': {}}
+[GUI] Test message received: Test message #10 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #10 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #10 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743268544.2866123, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743268543.2544918, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] SRC stage initialized
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 512403)', 'level': 'info'}, 'timestamp': 1743268543.2720678, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] Process started (PID: 512403)
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268544.287789, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
+[SERVER] Processing message from src: MessageType.LOG
+[SERVER] Processing message from src: MessageType.STATUS[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info'}, 'timestamp': 1743268543.274, 'metadata': {}}
+
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] Configuring audio_device source
+[SERVER] Processing message from src: MessageType.LOG[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268544.2881496, 'metadata': {}}
+
+[GUI] Processing message - Type: MessageType.STATUS, Source: srcstage
+[SERVER] Processing message from asr: MessageType.LOG
+[GUI] Raw message received: {'source': 'srcstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743268543.274755, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: srcstage
+[GUI] Formatted log message: [srcstage.info] SRC stage configured and running
+[SERVER] Processing message from asr: MessageType.LOG[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743268543.2550557, 'metadata': {}}
+
+[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
+[GUI] Formatted log message: [asrstage.info] ASR stage initialized
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 512405)', 'level': 'info'}, 'timestamp': 1743268543.7862308, 'metadata': {}}
+[SERVER] Processing message from asr: MessageType.STATUS[GUI] Processing message - Type: MessageType.LOG, Source: asrstage
+
+[GUI] Formatted log message: [asrstage.info] Process started (PID: 512405)
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743268544.2887933, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
+[SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asrstage', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743268544.2889533, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asrstage
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
+[DEBUG] Message accepted - server
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 512403)', Filters: set()
 [DEBUG] Message accepted - src
 [DEBUG] Processing message - Original source: 'srcstage', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
 [DEBUG] Message accepted - src
@@ -161,91 +358,57 @@ Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 [DEBUG] Message accepted - src
 [DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
 [DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 424355)', Filters: set()
+[DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 512405)', Filters: set()
 [DEBUG] Message accepted - asr
 [DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
 [DEBUG] Message accepted - asr
 [DEBUG] Processing message - Original source: 'asrstage', Normalized source: 'asr', Level: 'configured', Message: 'configured', Filters: set()
 [DEBUG] Message accepted - asr
-[SERVER] Sent test message #4
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #4 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #4 from server'}, 'timestamp': 1743265792.4479506, 'metadata': {}}
-[GUI] Test message received: Test message #4 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #4 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #4 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: start_recording
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'recording_started', 'details': {}}, 'timestamp': 1743265795.957616, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'recording_started', Message: 'recording_started', Filters: set()
-[DEBUG] Message accepted - server
-[SERVER] Sent test message #5
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #5 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #5 from server'}, 'timestamp': 1743265797.4481914, 'metadata': {}}
-[GUI] Test message received: Test message #5 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #5 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #5 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Sent test message #6
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #6 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #6 from server'}, 'timestamp': 1743265802.4483793, 'metadata': {}}
-[GUI] Test message received: Test message #6 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #6 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #6 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Sent test message #7
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #7 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #7 from server'}, 'timestamp': 1743265807.4485855, 'metadata': {}}
-[GUI] Test message received: Test message #7 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #7 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #7 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Sent test message #8
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #8 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #8 from server'}, 'timestamp': 1743265812.4488077, 'metadata': {}}
-[GUI] Test message received: Test message #8 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #8 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #8 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Sent test message #9
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #9 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #9 from server'}, 'timestamp': 1743265817.4490328, 'metadata': {}}
-[GUI] Test message received: Test message #9 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #9 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #9 from server', Filters: set()
-[DEBUG] Message accepted - test
-[SERVER] Sent test message #10
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #10 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #10 from server'}, 'timestamp': 1743265822.4492402, 'metadata': {}}
-[GUI] Test message received: Test message #10 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #10 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #10 from server', Filters: set()
-[DEBUG] Message accepted - test
 [SERVER] Sent test message #11
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #11 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #11 from server'}, 'timestamp': 1743265827.4494343, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #11 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #11 from server'}, 'timestamp': 1743268548.9327412, 'metadata': {}}
 [GUI] Test message received: Test message #11 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #11 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #11 from server', Filters: set()
 [DEBUG] Message accepted - test
-[SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: stop
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743265832.1301064, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743265832.2526727, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': "Failed to receive message: Invalid message format: 'source'", 'level': 'warning', 'raw_source': 'server', 'formatted': "[server.warning] Failed to receive message: Invalid message format: 'source'"}, 'timestamp': 1743265832.2537618, 'metadata': {}}
-[GUI] Processing message - Type: MessageType.LOG, Source: server
-[GUI] Formatted log message: [server.warning] Failed to receive message: Invalid message format: 'source'
 [SERVER] Sent test message #12
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #12 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #12 from server'}, 'timestamp': 1743265832.4497037, 'metadata': {}}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #12 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #12 from server'}, 'timestamp': 1743268553.932979, 'metadata': {}}
 [GUI] Test message received: Test message #12 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #12 from server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743265837.1940956, 'metadata': {}}
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #12 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Sent test message #13
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #13 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #13 from server'}, 'timestamp': 1743268558.9331892, 'metadata': {}}
+[GUI] Test message received: Test message #13 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #13 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #13 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Sent test message #14
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #14 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #14 from server'}, 'timestamp': 1743268563.933404, 'metadata': {}}
+[GUI] Test message received: Test message #14 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #14 from server
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #14 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: stop
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743268568.336682, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743265837.1941955, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743268568.4381926, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743265837.294415, 'metadata': {}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': "Failed to receive message: Invalid message format: 'source'", 'level': 'warning', 'raw_source': 'server', 'formatted': "[server.warning] Failed to receive message: Invalid message format: 'source'"}, 'timestamp': 1743268568.439319, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.LOG, Source: server
+[GUI] Formatted log message: [server.warning] Failed to receive message: Invalid message format: 'source'
+[SERVER] Sent test message #15
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #15 from server', 'level': 'info', 'raw_source': 'test', 'formatted': '[test.info] Test message #15 from server'}, 'timestamp': 1743268568.9336243, 'metadata': {}}
+[GUI] Test message received: Test message #15 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #15 from server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743268573.399643, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743268573.399706, 'metadata': {}}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743268573.499945, 'metadata': {}}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server

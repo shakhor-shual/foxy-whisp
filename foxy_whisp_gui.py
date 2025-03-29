@@ -56,7 +56,7 @@ class FoxyWhispGUI:
         # Server control button
         self.server_btn = ttk.Button(
             self.control_frame,
-            text="Start Server",
+            text="Старт",
             command=self.toggle_server
         )
         self.server_btn.pack(side=tk.LEFT, fill=tk.X, padx=5, pady=5)
@@ -105,9 +105,9 @@ class FoxyWhispGUI:
         """Toggle server state and update UI"""
         if self.server_running:
             self.send_command("stop")
+            self.server_btn.configure(state='disabled')  # Блокируем кнопку при остановке
         else:
-            # Временно отключаем кнопку до получения ответа
-            self.server_btn.configure(state='disabled')
+            self.server_btn.configure(state='disabled')  # Блокируем при запуске
             self.send_command("start", vars(self.args))
 
     def toggle_audio_source(self):
@@ -604,13 +604,13 @@ class FoxyWhispGUI:
             # Update GUI state based on status
             if status == 'server_initialized':
                 self.server_running = False
-                self.message_queue.put(('update_button', (self.server_btn, {'text': "Start Server"})))
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Старт", 'state': 'normal'})))
             elif status == 'pipeline_started':
                 self.server_running = True
-                self.message_queue.put(('update_button', (self.server_btn, {'text': "Stop Server"})))
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Стоп", 'state': 'normal'})))
             elif status in ('pipeline_stopped', 'pipeline_error', 'shutdown'):
                 self.server_running = False
-                self.message_queue.put(('update_button', (self.server_btn, {'text': "Start Server"})))
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Старт", 'state': 'normal'})))
                 if self.recording:
                     self.recording = False
                     self.message_queue.put(('update_button', (self.record_btn, {'text': "Start Recording"})))
