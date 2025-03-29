@@ -1,10 +1,8 @@
-from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, Optional
-import time
-import logging
-import os
+from typing import Optional, Dict, Any, Union
 from multiprocessing import Queue
+import time
+from .message_validator import MessageValidator, MessageSource
 
 class MessageType(Enum):
     LOG = auto()
@@ -13,117 +11,92 @@ class MessageType(Enum):
     COMMAND = auto()
     CONTROL = auto()
 
-@dataclass
 class PipelineMessage:
-    source: str
-    type: MessageType
-    content: Any
-    timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    @classmethod
-    def create_log(cls, source: str, message: str, level: str = "info", **kwargs):
-        """Создание сообщения лога с унифицированным форматированием"""
-        # Добавляем поддержку debug уровня
-        if "PYTHONDEBUGLEVEL" in os.environ:
-            if level == "debug" and os.environ["PYTHONDEBUGLEVEL"] != "1":
-                return None
-
-        # Важно: всегда используем нижний регистр для source и level
-        source = source.lower().strip()
-        level = level.lower().strip()
+    def __init__(self, source: str, type: MessageType, content: Dict[str, Any]):
+        self.source = MessageSource.normalize(source)
+        self.type = type
+        self.content = content
+        self.timestamp = time.time()
         
-        # Убираем лишние уровни из source, если они есть
-        if '.' in source:
-            source = source.split('.')[0]
+        if not self._validate():
+            raise ValueError(f"Invalid message format for type {type}")
+
+    def _validate(self) -> bool:
+        """Validate message format"""
+        if not MessageValidator.validate_source(self.source):
+            return False
             
-        return cls(
-            source=source,
-            type=MessageType.LOG,
-            content={
-                'message': message,
-                'level': level,
-                'raw_source': source,  # сохраняем оригинальный источник
-                'formatted': f"[{source}.{level}] {message}"
-            },
-            metadata=kwargs
-        )
-
-    @classmethod
-    def create_status(cls, source: str, status: str, **details):
-        """Создание сообщения статуса"""
-        return cls(
-            source=source.lower(),
-            type=MessageType.STATUS,
-            content={
-                'status': status,
-                'details': details
-            }
-        )
-
-    @classmethod
-    def create_data(cls, source: str, data_type: str, data: Any, **metadata):
-        """Создание сообщения с данными"""
-        return cls(
-            source=source.lower(),
-            type=MessageType.DATA,
-            content={
-                'data_type': data_type,
-                'payload': data
-            },
-            metadata=metadata
-        )
-
-    @classmethod
-    def create_command(cls, source: str, command: str, **params):
-        """Создание командного сообщения"""
-        return cls(
-            source=source.lower(),
-            type=MessageType.COMMAND,
-            content={
-                'command': command,
-                'params': params
-            }
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Преобразование в словарь для передачи через Queue"""
-        return {
-            'source': self.source,
-            'type': self.type.name.lower(),
-            'content': self.content,
-            'timestamp': self.timestamp,
-            'metadata': self.metadata
+        if not isinstance(self.content, dict):
+            return False
+            
+        validators = {
+            MessageType.LOG: MessageValidator.validate_log_content,
+            MessageType.STATUS: MessageValidator.validate_status_content,
+            MessageType.DATA: MessageValidator.validate_data_content,
+            MessageType.COMMAND: MessageValidator.validate_command_content
         }
+        
+        return validators.get(self.type, lambda x: True)(self.content)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]):
-        """Создание из словаря (из Queue)"""
-        try:
-            return cls(
-                source=data['source'],
-                type=MessageType[data['type'].upper()],
-                content=data['content'],
-                timestamp=data.get('timestamp', time.time()),
-                metadata=data.get('metadata', {})
-            )
-        except (KeyError, AttributeError) as e:
-            raise ValueError(f"Invalid message format: {e}")
+    def create_log(cls, source: str, message: str, level: str = "info", **kwargs) -> 'PipelineMessage':
+        """Create a log message"""
+        content = {
+            'message': message,
+            'level': level.lower(),
+            **kwargs
+        }
+        return cls(source, MessageType.LOG, content)
 
-    def send(self, queue: Queue):
-        """Отправка сообщения в очередь"""
-        if not queue:
-            raise ValueError("Queue is not initialized")
-        queue.put(self.to_dict())
+    @classmethod
+    def create_status(cls, source: str, status: str, **details) -> 'PipelineMessage':
+        """Create a status message"""
+        content = {
+            'status': status,
+            'details': details
+        }
+        return cls(source, MessageType.STATUS, content)
+
+    @classmethod
+    def create_data(cls, source: str, data_type: str, data: Any, **metadata) -> 'PipelineMessage':
+        """Create a data message"""
+        content = {
+            'data_type': data_type,
+            'payload': data,
+            **metadata
+        }
+        return cls(source, MessageType.DATA, content)
+
+    @classmethod
+    def create_command(cls, source: str, command: str, **params) -> 'PipelineMessage':
+        """Create a command message"""
+        content = {
+            'command': command,
+            'params': params
+        }
+        return cls(source, MessageType.COMMAND, content)
+
+    def send(self, queue: Queue) -> bool:
+        """Send message to queue with validation"""
+        if queue is None:
+            return False
+        try:
+            queue.put(self)
+            return True
+        except:
+            return False
 
     @staticmethod
     def receive(queue: Queue, timeout: float = 0.1) -> Optional['PipelineMessage']:
-        """Получение сообщения из очереди"""
+        """Receive message from queue with validation"""
+        if queue is None:
+            return None
         try:
-            if not queue.empty():
-                return PipelineMessage.from_dict(queue.get(timeout=timeout))
-        except Exception as e:
-            logging.warning(f"Failed to receive message: {e}")
+            msg = queue.get(timeout=timeout)
+            if isinstance(msg, PipelineMessage):
+                return msg
+        except:
+            pass
         return None
 
     def is_log(self) -> bool:
@@ -140,15 +113,3 @@ class PipelineMessage:
 
     def is_control(self) -> bool:
         return self.type == MessageType.CONTROL
-
-    def get_log_level(self) -> str:
-        return self.content['level'] if self.is_log() else ''
-
-    def get_status(self) -> str:
-        return self.content['status'] if self.is_status() else ''
-
-    def get_command(self) -> str:
-        return self.content['command'] if self.is_command() else ''
-
-    def get_data_type(self) -> str:
-        return self.content['data_type'] if self.is_data() else ''
