@@ -164,9 +164,17 @@ class AudioDeviceSource:
             self.send_status('configured')
             
         except Exception as e:
-            self.log("error", "Failed to start audio stream",
-                    error=str(e),
-                    device=self.device)
+            self.send_exception(
+                e,
+                "Failed to start audio stream",
+                level="error",
+                component="audio_device",
+                device_info={
+                    'device': self.device,
+                    'samplerate': self.samplerate,
+                    'blocksize': self.blocksize
+                }
+            )
             raise
 
     def stop(self):
@@ -186,7 +194,8 @@ class AudioDeviceSource:
                 status,
                 "Audio callback status",
                 level="warning",
-                frames=frames
+                frames=frames,
+                time_info=str(time_info)
             )
         
         try:
@@ -222,14 +231,17 @@ class AudioDeviceSource:
                 e,
                 "Audio processing error",
                 level="error",
-                frames=frames,
-                buffer_size=len(self.accumulation_buffer)
+                details={
+                    'frames': frames,
+                    'buffer_size': len(self.accumulation_buffer),
+                    'queue_size': len(self.internal_queue)
+                }
             )
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
         try:
-            if self.internal_queue:
+            if len(self.internal_queue) > 0:  # Заменяем прямую проверку на len()
                 data = self.internal_queue.popleft()
                 # Проверяем что данные валидны
                 if not isinstance(data, np.ndarray):

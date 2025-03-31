@@ -300,7 +300,16 @@ class SRCstage(PipelineElement):
             
             self.send_status('configured')
         except Exception as e:
-            self.send_log(f"Failed to configure source: {e}", level="error")
+            self.send_exception(
+                e,
+                "Failed to configure source",
+                level="error",
+                component="configuration",
+                component_info={
+                    'stage_id': self.stage_id,
+                    'source_type': self.args.get("listen", "tcp")
+                }
+            )
             raise
 
     def send_level_message(self, level: int, is_silence: bool = False):
@@ -370,7 +379,7 @@ class SRCstage(PipelineElement):
         except Exception as e:
             self.send_exception(
                 e,
-                "Process error",
+                "Audio processing error",
                 component="processor",
                 component_info={
                     'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,

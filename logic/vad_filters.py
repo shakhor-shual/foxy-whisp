@@ -238,15 +238,44 @@ class WebRTCVAD(VADBase):
                 frame_info={
                     'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
                     'expected_size': self.frame_size,
-                    'audio_dtype': str(audio_chunk.dtype) if audio_chunk is not None else None,
-                    'max_value': float(max_abs) if 'max_abs' in locals() else None
+                    'audio_dtype': str(audio_chunk.dtype) if audio_chunk is not None else None
                 }
             )
             return False
 
-    def get_chunk_size(self):
-        """Возвращает размер чанка для WebRTC VAD."""
-        return self.frame_size
+    def process(self):
+        """Обработка аудиоданных из буфера."""
+        chunk_size = self.get_chunk_size()
+        audio_chunk = self.audio_buffer.get_chunk(chunk_size)
+        if audio_chunk is None:
+            return None  # Недостаточно данных для обработки
+
+        try:
+            voice_detected = self.detect_voice(audio_chunk)
+            self._update_state("speech" if voice_detected else "silence")
+            
+            # Send detailed status
+            self.send_status(
+                "processing",
+                voice_detected=voice_detected,
+                chunk_size=chunk_size,
+                buffer_size=len(self.audio_buffer.buffer)
+            )
+            
+            return audio_chunk if voice_detected else None
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "VAD buffer processing error",
+                level="error",
+                error_location=f"WebRTCVAD[{self.vad_id}].process",
+                buffer_info={
+                    'buffer_size': len(self.audio_buffer.buffer),
+                    'chunk_size': self.get_chunk_size()
+                }
+            )
+            return None
 
 
 class SileroVAD(VADBase):

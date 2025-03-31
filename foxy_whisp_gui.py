@@ -581,8 +581,13 @@ class FoxyWhispGUI:
                 print("[GUI] Queue EOF received")
                 break
             except Exception as e:
-                print(f"[GUI] Queue error: {str(e)}")
-                self.append_text_safe(f"[ERROR] Message receive error: {str(e)}")
+                import traceback
+                error_context = {
+                    'traceback': traceback.format_exc(),
+                    'server_queue_state': not self.server_to_gui._closed if self.server_to_gui else None
+                }
+                print(f"[GUI] Queue error: {e}")
+                self.append_text_safe(f"[ERROR] Message receive error\nContext: {error_context}")
                 break
 
     def handle_server_message(self, msg: PipelineMessage):
@@ -631,10 +636,11 @@ class FoxyWhispGUI:
             error_context = {
                 'traceback': traceback.format_exc(),
                 'message_type': msg.type if msg else None,
-                'message_source': msg.source if msg else None
+                'message_source': msg.source if msg else None,
+                'message_content': msg.content if msg else None
             }
             self.append_text_safe(f"[ERROR] Message processing failed: {e}\n" + 
-                                  f"Traceback:\n{error_context['traceback']}")
+                                  f"Context: {error_context}")
 
     def handle_status_message(self, msg: PipelineMessage):
         """Handle status updates from server"""
