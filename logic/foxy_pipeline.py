@@ -274,6 +274,11 @@ class SRCstage(PipelineElement):
         self.min_level_update_interval = 0.05  # Уменьшаем минимальный интервал между обновлениями в секундах
         self.stage_id = f"src_{id(self)}"  # Добавляем уникальный идентификатор стейджа
         self.send_log("SRC stage initialized", details={"buffer_size": self.fifo_buffer.max_size})
+        self._source_active = False  # Флаг активности источника
+        self._recording_state = "stopped"  # состояние записи
+        self._is_configured = False  # Новый флаг для отслеживания конфигурации
+        self._current_device = None  # Добавляем явную инициализацию
+        self._last_sent_state = None  # Добавляем отслеживание последнего отправленного состояния
 
     def send_log(self, message: str, level: str = "info", **kwargs):
         """Enhanced logging with source identification"""
@@ -318,10 +323,10 @@ class SRCstage(PipelineElement):
 
     def configure(self):
         """Initialize audio source based on configuration"""
-        listen_type = self.args.get("listen", "tcp")
-        self.send_log(f"Configuring {listen_type} source")
-        
         try:
+            listen_type = self.args.get("listen", "tcp")
+            self.send_log(f"Configuring {listen_type} source")
+            
             if listen_type == "tcp":
                 self.source = TCPSource(
                     args=self.args, 
@@ -334,31 +339,81 @@ class SRCstage(PipelineElement):
                 self.tcp_thread.daemon = True
                 self.tcp_thread.start()
             elif listen_type == "audio_device":
+                from logic.foxy_utils import get_default_audio_device, initialize_audio_device
+                
+                # Get device info using existing utils
+                if self.args.get("audio_device") is not None:
+                    device_id, sample_rate = initialize_audio_device(self.args)
+                    self._current_device = {
+                        'device_id': device_id,
+                        'samplerate': sample_rate,
+                        'name': sd.query_devices(device_id)['name']
+                    }
+                else:
+                    self._current_device = get_default_audio_device()
+                
                 self.source = AudioDeviceSource(
-                    samplerate=self.args.get("sample_rate", 16000),
+                    samplerate=self._current_device['default_samplerate'],
                     blocksize=self.args.get("chunk_size", 320),
-                    device=self.args.get("audio_device"),
+                    device=self._current_device['device_id'],
                     stop_event=self.stop_event,
-                    container=self  # Pass self as container
+                    container=self
                 )
-                # Запускаем AudioDeviceSource
-                self.source.run()  # Добавляем явный запуск
-            else:
-                raise ValueError(f"Unknown source type: {listen_type}")
+                # Немедленно запускаем источник
+                self.source.run()
+
+            # После успешной конфигурации:
+            self._is_configured = True
+            self._source_active = True  # Источник сконфигурирован и активен
+            self._recording_state = "ready"  # Новое состояние готовности
             
+            # Отправляем обновленный статус
+            self.send_source_status()
             self.send_status('configured')
+            
+            # Отправляем начальное состояние
+            self.send_initial_state()
+
         except Exception as e:
-            self.send_exception(
-                e,
-                "Failed to configure source",
-                level="error",
-                component="configuration",
-                component_info={
-                    'stage_id': self.stage_id,
-                    'source_type': self.args.get("listen", "tcp")
-                }
-            )
+            self._is_configured = False
+            self._source_active = False
+            self._recording_state = "error"
+            self.send_exception(e, "Failed to configure source")
             raise
+
+    def send_initial_state(self):
+        """Send complete initial state after configuration"""
+        # Отправляем полное состояние источника
+        self.send_source_status()
+        
+        # Отправляем начальные значения индикаторов
+        self.send_data('audio_level', {
+            'level': 0,
+            'timestamp': time.time(),
+            'is_silence': True
+        })
+        
+        self.send_data('vad_status', {
+            'active': False,
+            'voice_detected': False
+        })
+
+    def send_source_status(self):
+        """Send current source status with state"""
+        current_state = {
+            'active': self._source_active,
+            'current_device': self._current_device,
+            'recording_state': self._recording_state,
+            'is_configured': self._is_configured,
+            'available_devices': AudioDeviceSource.get_audio_devices() 
+                               if hasattr(self.source, 'device') 
+                               else None
+        }
+        
+        # Отправляем только если состояние изменилось
+        if current_state != self._last_sent_state:
+            self.send_data('source_status', current_state)
+            self._last_sent_state = current_state.copy()
 
     def send_level_message(self, level: int, is_silence: bool = False):
         """Отправка сообщения об уровне сигнала"""
@@ -463,29 +518,76 @@ class SRCstage(PipelineElement):
         """Handle incoming commands"""        
         cmd = command.get('command')
         if cmd == 'get_audio_devices':
-            # Get devices list from AudioDeviceSource
-            devices_info = AudioDeviceSource.get_audio_devices()
+            from logic.foxy_utils import get_default_audio_device
+            # Use existing util function and format for UI
+            default_dev = get_default_audio_device()
+            devices_info = {
+                'devices': [{
+                    'index': default_dev['device_id'],
+                    'name': default_dev['name'],
+                    'channels': default_dev['max_input_channels'],
+                    'default': True
+                }]
+            }
             self.send_data('audio_devices', devices_info)
-        elif cmd == 'stop':
-            self.stop_event.set()
-        elif cmd == 'pause':
-            self.pause_event.set()
-        elif cmd == 'resume':
+        elif cmd == 'start_recording':
+            if self._recording_state not in ["stopped", "ready"]:
+                return
+                
+            self._recording_state = "starting"
+            self.send_source_status()
+            
+            if not self._source_active:
+                if hasattr(self.source, 'run'):
+                    self.source.run()
+                self._source_active = True
+                
+            self._recording_state = "recording"
+            self.send_source_status()
             self.pause_event.clear()
+            
+        elif cmd == 'stop_recording':
+            if self._recording_state != "recording":
+                return
+                
+            self._recording_state = "stopping"
+            self.send_source_status()
+            
+            if hasattr(self.source, 'stop'):
+                self.source.stop()
+                
+            # Clear buffers
+            self.fifo_buffer = AudioBuffer(sample_rate=16000, max_duration=1)
+            self.vad_chunks_counter = 0
+            
+            # Reset indicators
+            self.send_data('vad_status', {
+                'active': False,
+                'voice_detected': False
+            })
+            self.send_data('audio_level', {
+                'level': 0,
+                'timestamp': time.time(),
+                'is_silence': True
+            })
+            
+            self._source_active = False  # Источник остановлен
+            self._recording_state = "stopped"
+            self.send_source_status()
+            self.pause_event.set()
 
     def _run(self):
         self.send_status('starting')
         try:
             self.configure()
-            self.send_log("SRC stage configured and running", level="info")
-            
-            # Добавляем проверку на запуск источника
-            if hasattr(self.source, 'stream') and self.source.stream is None:
-                self.source.run()
+            # После configure обязательно отправляем начальное состояние
+            self.send_initial_state()
             
             while not self.stop_event.is_set():
                 self.process_control_commands()
                 if self.pause_event.is_set():
+                    # Отправляем статус при паузе
+                    self.send_source_status()
                     self.send_log("Processing paused", level="debug")
                     time.sleep(0.1)
                     continue

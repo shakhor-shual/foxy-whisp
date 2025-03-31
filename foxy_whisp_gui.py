@@ -32,6 +32,12 @@ class FoxyWhispGUI:
         self.audio_input = None
         self.message_queue = queue.Queue()  # Queue for safe thread communication
         self.log_filter = LogFilter()
+        self.source_initialized = False  # Добавляем флаг инициализации источника
+        self.source_state = {
+            'active': False,
+            'recording_state': 'stopped',
+            'is_configured': False
+        }
 
         self.setup_gui()
         self.start_queue_listener()
@@ -473,15 +479,16 @@ class FoxyWhispGUI:
 
     def toggle_recording(self):
         """Toggle audio recording state"""
+        # Проверяем текущее состояние кнопки
+        if self.record_btn['state'] == 'disabled':
+            return
+            
         if self.recording:
+            self.record_btn.config(state='disabled', text="Stopping...")
             self.send_command("stop_recording")
-            self.record_btn.config(text="Start Recording")
-            print("[GUI.DEBUG] Stopping recording")  # Отладка
         else:
+            self.record_btn.config(state='disabled', text="Starting...")
             self.send_command("start_recording")
-            self.record_btn.config(text="Stop Recording")
-            print("[GUI.DEBUG] Starting recording")  # Отладка
-        self.recording = not self.recording
 
     def toggle_advanced(self):
         """Toggle between basic and advanced views"""
@@ -670,13 +677,35 @@ class FoxyWhispGUI:
             source = msg.source.lower()
             details = msg.content.get('details', {})
             
-            # Add VAD status handling
-            if source == 'src.vad':
-                if 'voice_detected' in details:
-                    vad_active = details['voice_detected']
-                    self.message_queue.put(('update_vad', vad_active))
-                    return
-
+            # Update GUI state based on status
+            if status == 'server_initialized':
+                self.server_running = True
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Стоп", 'state': 'normal'})))
+                # Явно запрашиваем состояние источника
+                self.send_command("get_source_status")
+                
+            elif status == 'pipeline_started':
+                self.server_running = True
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Стоп", 'state': 'normal'})))
+                # Повторно запрашиваем состояние после старта пайплайна
+                self.send_command("get_source_status")
+                
+            elif status in ('pipeline_stopped', 'pipeline_error', 'shutdown'):
+                self.server_running = False
+                self.recording = False  # Сбрасываем состояние записи
+                self.source_state['active'] = False  # Сбрасываем состояние источника
+                self.source_state['recording_state'] = 'stopped'
+                self.message_queue.put(('update_button', (self.server_btn, {'text': "Старт", 'state': 'normal'})))
+                self.message_queue.put(('update_button', (self.record_btn, {'text': "Start Recording", 'state': 'normal'})))
+                
+            # Handle source status updates
+            if status == 'source_status':
+                if 'active' in details:
+                    self.recording = details['active']
+                    self.record_btn.config(
+                        text="Stop Recording" if self.recording else "Start Recording"
+                    )
+            
             # Existing status handling code
             if source == 'system':
                 source = 'server'
@@ -695,6 +724,12 @@ class FoxyWhispGUI:
                     self.recording = False
                     self.message_queue.put(('update_button', (self.record_btn, {'text': "Start Recording"})))
             
+            # Add status message handling for initial state
+            elif status == 'configured':
+                if source.startswith('src'):
+                    # Request current source status
+                    self.send_command("get_source_status")
+            
             # Send formatted message with details
             formatted_msg = f"[{source}.{status}] {status}"
             if isinstance(details, dict):
@@ -708,30 +743,56 @@ class FoxyWhispGUI:
             self.append_text_safe(f"[ERROR] Status handling error: {e}")
 
     def handle_data_message(self, msg: PipelineMessage):
-        """Handle data messages from server"""
         try:
             data_type = msg.content.get('data_type')
             payload = msg.content.get('payload')
             
-            if data_type == 'audio_level':
+            if data_type == 'source_status':
                 if isinstance(payload, dict):
-                    self.message_queue.put(('update_audio', payload))
-            elif data_type == 'audio_devices':
-                # Update devices list in combobox
-                devices = payload.get('devices', [])
-                input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices]
-                self.device_cb["values"] = input_devices
-                
-                if input_devices:
-                    # Find default device
-                    default_device = next((d for d in devices if d.get('is_default')), devices[0])
-                    self.device_cb.set(f"{default_device['name']} (ID: {default_device['index']})")
-                    self.args.audio_device = default_device['index']
-            elif data_type == 'transcription':
-                self.append_text_safe(f"TRANSCRIPT: {payload}")
-            elif data_type == 'log':
-                self.append_text_safe(f"TEST: {payload}")
-                
+                    # Обновляем локальное состояние
+                    self.source_state.update(payload)
+                    
+                    recording_state = self.source_state.get('recording_state', 'stopped')
+                    is_active = self.source_state.get('active', False)
+                    is_configured = self.source_state.get('is_configured', False)
+                    
+                    # Обновляем состояние кнопки в зависимости от статуса
+                    button_states = {
+                        'stopped': ('normal', 'Start Recording', False),
+                        'ready': ('normal', 'Start Recording', False),
+                        'starting': ('disabled', 'Starting...', False),
+                        'recording': ('normal', 'Stop Recording', True),
+                        'stopping': ('disabled', 'Stopping...', True),
+                        'error': ('disabled', 'Error', False)
+                    }
+                    
+                    if recording_state in button_states:
+                        state, text, is_recording = button_states[recording_state]
+                        if is_configured or recording_state == 'error':
+                            self.recording = is_recording
+                            self.record_btn.config(state=state, text=text)
+                    
+                    # Обновляем индикаторы
+                    if not is_active:
+                        self.level_bar["value"] = 0
+                        self.message_queue.put(('update_vad', False))
+                    
+                    # Обрабатываем информацию об устройстве
+                    if 'current_device' in payload:
+                        self.update_device_info(payload['current_device'])
+                        
+            elif data_type == 'audio_level':
+                if isinstance(payload, dict):
+                    level = payload.get('level', 0)
+                    if isinstance(level, (int, float)):
+                        self.level_bar["value"] = level
+            
+            elif data_type == 'asr_result':
+                if isinstance(payload, dict):
+                    text = payload.get('text', '')
+                    if text:
+                        self.append_text_safe(f"[ASR] {text}")
+                        
         except Exception as e:
             import traceback
             error_context = {
@@ -740,8 +801,15 @@ class FoxyWhispGUI:
                 'payload_type': type(msg.content.get('payload')).__name__
             }
             self.append_text_safe(f"[ERROR] Data handling error: {e}\n" + 
-                                  f"Context: {error_context}\n" + 
-                                  f"Traceback:\n{error_context['traceback']}")
+                                f"Context: {error_context}")
+
+    def update_device_info(self, device_info):
+        """Update audio device information in GUI"""
+        if device_info and isinstance(device_info, dict):
+            device_name = device_info.get('name', 'Unknown Device')
+            device_id = device_info.get('device_id', -1)
+            self.device_cb['values'] = [f"{device_name} (ID: {device_id})"]
+            self.device_cb.set(f"{device_name} (ID: {device_id})")
 
     def update_audio_level_safe(self, level):
         """Thread-safe version of update_audio_level"""

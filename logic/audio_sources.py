@@ -10,6 +10,7 @@ import select
 from collections import deque
 from multiprocessing import Event
 from scipy.signal import resample
+from logic.foxy_utils import get_default_audio_device  # Используем существующую функцию
 
 class AudioDeviceSource:
     def __init__(self, samplerate=None, blocksize=320, device=None, 
@@ -44,14 +45,31 @@ class AudioDeviceSource:
             print(f"Error listing audio devices: {e}")
         return devices
 
-    @classmethod
-    def get_audio_devices(cls):
-        """Method that can be called from SRCstage to get devices list"""
-        devices = cls.list_devices()
-        return {
-            "status": "ok",
-            "devices": devices
-        }
+    @staticmethod
+    def get_audio_devices():
+        """Get list of available audio input devices using sounddevice"""
+        devices = []
+        try:
+            for i, device in enumerate(sd.query_devices()):
+                if device['max_input_channels'] > 0:
+                    devices.append({
+                        'index': i,
+                        'name': device['name'],
+                        'channels': device['max_input_channels'],
+                        'default': i == sd.default.device[0]
+                    })
+        except Exception as e:
+            print(f"Error getting audio devices: {e}")
+        return devices
+
+    @staticmethod
+    def get_current_device():
+        """Get current active audio device info"""
+        try:
+            return get_default_audio_device()  # Используем существующую функцию
+        except Exception as e:
+            print(f"Error getting current device: {e}")
+            return None
 
     def _send_message(self, msg_type: MessageType, content: dict):
         """Унифицированный метод отправки сообщений"""
@@ -178,14 +196,27 @@ class AudioDeviceSource:
             raise
 
     def stop(self):
-        """Остановка захвата аудио."""
-        if self.stream:
-            self.stream.stop()
-            self.stream.close()
-            self.stream = None
-            # Отправляем статус остановки
+        """Stop audio capture and clear buffers"""
+        try:
+            if self.stream:
+                self.stream.stop()
+                self.stream.close()
+                self.stream = None
+                
+            # Clear buffers
+            self.accumulation_buffer.clear()
+            self.internal_queue.clear()
+            
+            # Send status updates
             self.send_status('stopped')
-            self.log("info", "Audio device stopped")
+            self.send_data('audio_level', {
+                'level': 0,
+                'timestamp': time.time(),
+                'is_silence': True
+            })
+            self.log("info", "Audio device stopped and buffers cleared")
+        except Exception as e:
+            self.send_exception(e, "Error stopping audio device")
 
     def callback(self, indata, frames, time_info, status):
         """Callback-функция для обработки аудиоданных."""
