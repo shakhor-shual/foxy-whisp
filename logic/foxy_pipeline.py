@@ -337,7 +337,7 @@ class SRCstage(PipelineElement):
             # Нормализация до float32 [-1, 1]
             if audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
-            if np.max(np.abs(audio_chunk)) > 1.0:  # Исправляем проблемную строку
+            if np.max(np.abs(audio_chunk)) > 1.0:
                 audio_chunk = audio_chunk / 32768.0
 
             # Измерение уровня входного сигнала
@@ -356,32 +356,41 @@ class SRCstage(PipelineElement):
                 self.send_log("Buffer updated", level="debug", 
                             details={"buffer_size": len(self.fifo_buffer.buffer)})
             
-            # Обработка данных из буфера
-            while chunk := self.fifo_buffer.get_chunk(self.vad.frame_size):
-                try:
-                    if self.vad.detect_voice(chunk):
-                        self.audio_write(chunk)
-                except Exception as e:
-                    self.send_exception(
-                        e,
-                        "VAD processing error",
-                        component="vad",
-                        component_info={
-                            'frame_size': self.vad.frame_size,
-                            'chunk_size': len(chunk)
-                        }
-                    )
-                    break
+            # Обработка данных через VAD
+            try:
+                while True:
+                    chunk = self.fifo_buffer.get_chunk(self.vad.frame_size)
+                    if chunk is None or chunk.size == 0:
+                        break
+                        
+                    if hasattr(self.vad, 'detect_voice'):
+                        voice_detected = self.vad.detect_voice(chunk)
+                        if voice_detected:
+                            self.audio_write(chunk)
+                    else:
+                        self.send_log("VAD missing detect_voice method", level="error")
+                        break
+
+            except Exception as e:
+                self.send_log(
+                    f"VAD processing error: {str(e)}", 
+                    level="error",
+                    details={
+                        'component': 'vad',
+                        'frame_size': self.vad.frame_size,
+                        'chunk_size': len(chunk) if chunk is not None else 0
+                    }
+                )
 
             self.vad_chunks_counter += 1
             return None
 
         except Exception as e:
-            self.send_exception(
-                e,
-                "Audio processing error",
-                component="processor",
-                component_info={
+            self.send_log(
+                f"Audio processing error: {str(e)}", 
+                level="error",
+                details={
+                    'component': 'processor',
                     'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
                     'buffer_size': len(self.fifo_buffer.buffer) if hasattr(self, 'fifo_buffer') else 0
                 }

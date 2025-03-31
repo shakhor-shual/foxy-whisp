@@ -18,18 +18,48 @@ class AudioBuffer:
         self.buffer = np.array([], dtype=np.float32)
 
     def add_data(self, audio_data):
-        """Добавление новых аудиоданных в буфер."""
-        self.buffer = np.concatenate((self.buffer, audio_data))
-        if len(self.buffer) > self.max_size:
-            self.buffer = self.buffer[-self.max_size:]  # Удаляем старые данные
+        """Добавление новых аудиоданных в буфер с приведением размерности."""
+        try:
+            # Убедимся что входные данные одномерные
+            if audio_data.ndim > 1:
+                audio_data = np.mean(audio_data, axis=1)
+            
+            # Убедимся что буфер одномерный
+            if self.buffer.ndim > 1:
+                self.buffer = np.mean(self.buffer, axis=1)
+                
+            # Приводим типы к float32
+            audio_data = audio_data.astype(np.float32)
+            self.buffer = self.buffer.astype(np.float32)
+            
+            # Теперь конкатенируем
+            self.buffer = np.concatenate((self.buffer, audio_data))
+            
+            # Обрезаем если превышен максимальный размер
+            if len(self.buffer) > self.max_size:
+                self.buffer = self.buffer[-self.max_size:]
+                
+        except Exception as e:
+            print(f"Error in add_data: {e}")
+            # В случае ошибки очищаем буфер чтобы избежать проблем
+            self.buffer = np.array([], dtype=np.float32)
+            raise
 
     def get_chunk(self, chunk_size):
         """Получение чанка данных из буфера."""
-        if len(self.buffer) < chunk_size:
-            return None  # Недостаточно данных
-        chunk = self.buffer[:chunk_size]
-        self.buffer = self.buffer[chunk_size:]  # Удаляем прочитанные данные
-        return chunk
+        # Fix: Правильная проверка размера буфера
+        if len(self.buffer) < chunk_size or chunk_size <= 0:
+            return None
+            
+        try:
+            # Извлекаем чанк
+            chunk = self.buffer[:chunk_size].copy()  # Используем copy() для безопасности
+            # Обновляем буфер
+            self.buffer = self.buffer[chunk_size:]
+            return chunk
+        except Exception as e:
+            print(f"Error in get_chunk: {e}")
+            return None
 
 class VADBase(ABC):
     def __init__(self):
@@ -164,10 +194,11 @@ class WebRTCVAD(VADBase):
     def __init__(self, aggressiveness=3):
         super().__init__()
         self.vad = webrtcvad.Vad(aggressiveness)
+        self.aggressiveness = aggressiveness  # Сохраняем значение напрямую
         self.sample_rate = 16000
         self.frame_duration = 30
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
-        self.min_speech_frames = 1  # Минимальное количество фреймов с речью
+        self.min_speech_frames = 1
 
     def get_chunk_size(self):
         """Возвращает размер чанка для WebRTC VAD."""
@@ -176,11 +207,22 @@ class WebRTCVAD(VADBase):
     def get_config(self):
         """Возвращает конфигурацию WebRTC VAD"""
         return {
-            'aggressiveness': self.vad.mode,
+            'aggressiveness': self.aggressiveness,  # Используем сохраненное значение
             'sample_rate': self.sample_rate,
             'frame_duration': self.frame_duration,
             'frame_size': self.get_chunk_size()  # Используем метод вместо прямого доступа
         }
+
+    def send_exception(self, e: Exception, message: str = None, **kwargs):
+        """Send exception through status message"""
+        if self.control_queue:
+            error_details = {
+                'error': str(e),
+                'message': message or str(e),
+                'vad_id': self.vad_id,
+                **kwargs
+            }
+            self.send_status('error', **error_details)
 
     def detect_voice(self, audio_chunk):
         """Анализ аудиоданных с использованием WebRTC VAD."""

@@ -246,10 +246,17 @@ class AudioDeviceSource:
                 # Проверяем что данные валидны
                 if not isinstance(data, np.ndarray):
                     raise ValueError("Invalid audio data type")
-                if data.size == 0:
-                    raise ValueError("Empty audio data")
-                return data if data.size > 0 else None  # Явно проверяем размер массива
+                    
+                # Приводим к одномерному массиву если нужно
+                if data.ndim > 1:
+                    data = np.mean(data, axis=1)
+                    
+                # Проверяем размер и возвращаем данные
+                if data.size > 0:
+                    return data.astype(np.float32)  # Явно приводим к float32
+                return None
             return None
+            
         except Exception as e:
             self.send_exception(
                 e,
@@ -257,7 +264,8 @@ class AudioDeviceSource:
                 level="error",
                 details={
                     'queue_size': len(self.internal_queue) if self.internal_queue else 0,
-                    'error_type': type(e).__name__
+                    'error_type': type(e).__name__,
+                    'data_shape': data.shape if isinstance(data, np.ndarray) else None
                 }
             )
             return None
