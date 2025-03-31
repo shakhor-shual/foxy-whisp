@@ -40,6 +40,7 @@ class FoxyWhispGUI:
             'recording_state': 'stopped',
             'is_configured': False
         }
+        self._fade_update_after = None  # Add initialization
 
         self.setup_gui()
         self.start_queue_listener()
@@ -119,29 +120,41 @@ class FoxyWhispGUI:
         # Сохраняем текущий источник для возможного отката
         previous_source = self.args.listen
         
-        # Переключаем источник
-        self.args.listen = "audio_device" if self.args.listen == "tcp" else "tcp"
-        self.source_btn.config(text="Mic" if self.args.listen == "audio_device" else "TCP")
-        
-        # Обновляем состояние элементов управления
-        self.update_controls_activity()
-        
-        # Если сервер запущен, перезапускаем источник
-        if self.server_running:
-            # Останавливаем текущий источник
-            self.send_command("stop_stage", {"stage": "src"})
+        try:
+            # Переключаем источник
+            self.args.listen = "audio_device" if self.args.listen == "tcp" else "tcp"
+            self.source_btn.config(text="Mic" if self.args.listen == "audio_device" else "TCP")
             
-            # Обновляем параметры
-            self.send_command("update_params", vars(self.args))
+            # Обновляем состояние элементов управления
+            self.update_controls_activity()
             
-            # Запускаем источник с новыми параметрами
-            self.send_command("start_stage", {"stage": "src"})
-            
-            # Добавляем информацию в лог
-            self.append_text(f"[GUI.INFO] Switched audio source to {self.args.listen}")
-        else:
-            # Просто обновляем параметры если сервер не запущен
-            self.send_command("update_params", vars(self.args))
+            if self.server_running:
+                # Останавливаем запись если активна
+                if self.recording:
+                    self.send_command("stop_recording")
+                    time.sleep(0.2)  # Даем время на остановку записи
+                
+                # Останавливаем текущий источник
+                self.send_command("stop_stage", {"stage": "src"})
+                
+                # Обновляем параметры
+                self.send_command("update_params", vars(self.args))
+                
+                # Запускаем источник с новыми параметрами
+                time.sleep(0.5)  # Даем время на применение параметров
+                self.send_command("start_stage", {"stage": "src"})
+                
+                self.append_text(f"[GUI.INFO] Switched audio source to {self.args.listen}")
+            else:
+                # Просто обновляем параметры если сервер не запущен
+                self.send_command("update_params", vars(self.args))
+                
+        except Exception as e:
+            # В случае ошибки возвращаем предыдущий источник
+            self.args.listen = previous_source
+            self.source_btn.config(text="Mic" if self.args.listen == "audio_device" else "TCP")
+            self.update_controls_activity()
+            self.append_text(f"[GUI.ERROR] Failed to switch audio source: {str(e)}")
 
     def update_controls_activity(self):
         """Update controls state based on audio source"""

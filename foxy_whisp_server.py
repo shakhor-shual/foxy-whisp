@@ -264,9 +264,24 @@ class FoxyWhispServer:
             command = msg.content.get('command')
             params = msg.content.get('params', {})
             
-            print(f"[SERVER] Received command: {command}")  # Отладочный вывод
+            print(f"[SERVER] Received command: {command}")
             
-            if command == 'start':
+            if command == 'stop_stage':
+                stage = params.get('stage')
+                if stage and stage in self.processes:
+                    self._stop_stage(stage)
+            elif command == 'start_stage':
+                stage = params.get('stage')
+                if stage and stage in self.processes:
+                    self._start_stage(stage)
+            elif command == 'update_params':
+                # Обновляем параметры
+                if params:
+                    self.args.update(params)
+                    # Перезапускаем SRC если изменился тип источника
+                    if 'listen' in params and self.processes['src']:
+                        self._restart_stage('src')
+            elif command == 'start':
                 self.start_pipeline()
             elif command == 'stop':
                 self.stop_pipeline()
@@ -298,15 +313,141 @@ class FoxyWhispServer:
                             status='recording_stopped'
                         )
                     )
-            elif command == 'update_params':
-                # Обновление параметров
-                if params:
-                    self.args.update(params)
-                    logger.info("Parameters updated")
             elif command == 'shutdown':
                 logger.info("Received shutdown command")
                 self.stop_pipeline()
                 self._shutdown_requested = True
+
+    ####################
+    def _stop_stage(self, stage_name: str):
+        """Остановка отдельной стадии с улучшенной обработкой ошибок"""
+        if proc := self.processes.get(stage_name):
+            try:
+                logger.info(f"Stopping {stage_name} stage...")
+                
+                # Отправляем команду остановки
+                try:
+                    PipelineMessage.create_command(
+                        source='server',
+                        command='stop'
+                    ).send(getattr(self.queues, f'to_{stage_name}'))
+                except Exception as e:
+                    logger.error(f"Error sending stop command to {stage_name}: {e}", 
+                               exc_info=True)
+                
+                # Проверяем что процесс действительно наш дочерний
+                if proc.is_alive() and proc.parent_pid == os.getpid():
+                    # Даем время на graceful shutdown
+                    proc.join(timeout=2.0)
+                    
+                    if proc.is_alive():
+                        logger.warning(f"Force terminating {stage_name} process")
+                        proc.terminate()
+                        proc.join(timeout=1.0)
+                        
+                        # Если все еще жив - SIGKILL
+                        if proc.is_alive():
+                            import signal
+                            os.kill(proc.pid, signal.SIGKILL)
+                            logger.warning(f"SIGKILL sent to {stage_name} process")
+                else:
+                    logger.warning(f"{stage_name} process is not our child or not alive")
+                
+                # Очищаем ссылку на процесс
+                if hasattr(proc, 'close'):
+                    proc.close()
+                self.processes[stage_name] = None
+                
+                # Очищаем связанные очереди
+                self._clear_stage_queues(stage_name)
+                
+                logger.info(f"{stage_name} stage stopped")
+                
+            except Exception as e:
+                logger.error(f"Error during {stage_name} stage shutdown: {e}", 
+                           exc_info=True)
+                # Форсированная очистка в случае ошибки
+                self.processes[stage_name] = None
+
+    ####################
+    def _start_stage(self, stage_name: str):
+        """Запуск отдельной стадии"""
+        if stage_name not in self.processes:
+            return
+            
+        try:
+            # Создаем новый процесс стадии
+            if stage_name == 'src':
+                self.processes['src'] = SRCstage(
+                    stop_event=self.stop_event,
+                    audio_out=self.queues.src_2_asr,
+                    out_queue=self.queues.from_src,
+                    in_queue=self.queues.to_src,
+                    args=self.args,
+                    pipe_chunk_size=self.pipe_chunk
+                )
+            elif stage_name == 'asr':
+                self.processes['asr'] = ASRstage(
+                    stop_event=self.stop_event,
+                    audio_in=self.queues.src_2_asr,
+                    out_queue=self.queues.from_asr,
+                    in_queue=self.queues.to_asr,
+                    args=self.args,
+                    pipe_chunk_size=self.pipe_chunk
+                )
+
+            # Запускаем процесс
+            if proc := self.processes[stage_name]:
+                proc.start()
+                time.sleep(0.5)  # Даем время на инициализацию
+                
+                if not proc.is_alive():
+                    raise RuntimeError(f"Failed to start {stage_name} stage")
+                    
+                logger.info(f"{stage_name} stage started (PID: {proc.pid})")
+                
+        except Exception as e:
+            logger.error(f"Error starting {stage_name} stage: {e}")
+            self._stop_stage(stage_name)
+            raise
+
+    ####################
+    def _restart_stage(self, stage_name: str):
+        """Перезапуск отдельной стадии"""
+        try:
+            self._stop_stage(stage_name)
+            time.sleep(0.5)  # Даем время на освобождение ресурсов
+            self._start_stage(stage_name)
+        except Exception as e:
+            logger.error(f"Error restarting {stage_name} stage: {e}")
+            # Отправляем статус ошибки в GUI
+            self._send_gui_message(
+                PipelineMessage.create_status(
+                    source='system',
+                    status='stage_error',
+                    details={
+                        'stage': stage_name,
+                        'error': str(e)
+                    }
+                )
+            )
+
+    ####################
+    def _clear_stage_queues(self, stage_name: str):
+        """Очистка очередей связанных со стадией"""
+        queues_to_clear = []
+        if stage_name == 'src':
+            queues_to_clear = ['src_2_asr', 'from_src', 'to_src']
+        elif stage_name == 'asr':
+            queues_to_clear = ['from_asr', 'to_asr']
+            
+        for queue_name in queues_to_clear:
+            queue = getattr(self.queues, queue_name)
+            try:
+                while not queue.empty():
+                    queue.get_nowait()
+            except:
+                pass
 
     ####################
     def start_pipeline(self):
