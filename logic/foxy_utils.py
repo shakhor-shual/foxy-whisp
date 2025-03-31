@@ -111,6 +111,7 @@ def add_shared_args(parser):
     parser.add_argument('--lan', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
     parser.add_argument('--task', type=str, default='transcribe', choices=["transcribe", "translate"], help="Task: transcription or translation.")
     parser.add_argument('--vad', action="store_true", default=False, help="Enable VAD (Voice Activity Detection).")
+    parser.add_argument('--vad-fade-time', type=int, default=500, help="VAD fade time in milliseconds.")
     parser.add_argument('--vac', action="store_true", default=False, help="Enable VAC (Voice Activity Controller).")
     parser.add_argument('--vac-chunk-size', type=float, default=0.04, help="VAC segment size in seconds.")
 

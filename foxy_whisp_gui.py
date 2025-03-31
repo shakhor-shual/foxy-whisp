@@ -183,6 +183,37 @@ class FoxyWhispGUI:
         )
         self.vad_label.pack(side=tk.RIGHT, padx=5)
 
+        # Add VAD fade time slider
+        self.fade_frame = ttk.Frame(self.main_frame)
+        self.fade_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Label(self.fade_frame, text="VAD Fade:").pack(side=tk.LEFT)
+        
+        self.fade_value = tk.StringVar(value=str(self.args.vad_fade_time))
+        ttk.Label(self.fade_frame, textvariable=self.fade_value, width=4).pack(side=tk.RIGHT)
+        
+        self.fade_slider = ttk.Scale(
+            self.fade_frame,
+            from_=0,
+            to=1000,
+            orient=tk.HORIZONTAL,
+            command=self.on_fade_change
+        )
+        self.fade_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # Set initial value from args
+        self.fade_slider.set(self.args.vad_fade_time)
+
+    def on_fade_change(self, value):
+        """Handle fade slider changes"""
+        try:
+            fade_time = int(float(value))
+            # Update display
+            self.fade_value.set(str(fade_time))
+            # Send command to server
+            self.send_command("update_vad_fade_time", {"fade_time_ms": fade_time})
+        except ValueError:
+            pass
+
     def update_audio_level(self, level_data):
         """Update audio level meter.
         Args:

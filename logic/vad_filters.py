@@ -101,6 +101,25 @@ class VADBase(ABC):
         self.fade_time_ms = max(0, fade_time_ms)
         self.fade_frames = self._calculate_fade_frames()
 
+    def update_fade_time(self, fade_time_ms: int):
+        """Update fade time and recalculate frames"""
+        if fade_time_ms < 0:
+            return
+            
+        self.fade_time_ms = fade_time_ms
+        self.fade_frames = self._calculate_fade_frames()
+        
+        # Send status update
+        if hasattr(self, 'control_queue'):
+            PipelineMessage.create_status(
+                source='src.vad',
+                status='fade_time_updated',
+                details={
+                    'fade_time_ms': self.fade_time_ms,
+                    'fade_frames': self.fade_frames
+                }
+            ).send(self.control_queue)
+
     def connect_input(self, input_queue):
         """Подключение входной очереди."""
         self.input_queue = input_queue

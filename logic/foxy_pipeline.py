@@ -520,6 +520,15 @@ class SRCstage(PipelineElement):
     def _handle_command(self, command: Dict[str, Any]):
         """Handle incoming commands"""        
         cmd = command.get('command')
+        
+        if cmd == 'update_vad_fade_time':
+            fade_time = command.get('fade_time_ms')
+            if fade_time is not None and hasattr(self.vad, 'update_fade_time'):
+                self.vad.update_fade_time(fade_time)
+                self.send_status('vad_updated', 
+                               details={'fade_time_ms': fade_time})
+                return
+                
         if cmd == 'get_audio_devices':
             from logic.foxy_utils import get_default_audio_device
             # Use existing util function and format for UI
