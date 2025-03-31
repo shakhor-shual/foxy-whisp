@@ -14,6 +14,7 @@ from logic.audio_utils import calculate_vu_meter
 import traceback
 import os
 import threading
+import soundfile as sf
 
 
 class PipelineElement(ABC):
@@ -629,24 +630,169 @@ class ASRstage(PipelineElement):
             "Продолжаем тестирование системы",
             "Это имитация работы ASR"
         ]
+        self.debug_dir = os.path.join(os.getcwd(), "debug_audio")
+        self.debug_file_path = os.path.join(self.debug_dir, "pipeline_debug.wav")
+        self.debug_recording = False
+        self.debug_file = None
+        self.debug_sample_rate = 16000
+        self.stop_recording_requested = False  # Флаг запроса на остановку записи
+        self.recording_stopped = True  # Флаг состояния записи
         self.send_log("ASR stage initialized")
 
-    def configure(self):
-        self.send_status('configured')
+    def init_debug_recording(self):
+        """Initialize debug recording"""
+        try:
+            # Создаем директорию если её нет
+            os.makedirs(self.debug_dir, exist_ok=True)
+            
+            # Открываем файл для записи
+            self.debug_file = sf.SoundFile(
+                self.debug_file_path,
+                mode='w',
+                samplerate=self.debug_sample_rate,
+                channels=1,
+                format='WAV'
+            )
+            self.debug_recording = True
+            self.recording_stopped = False
+            self.send_log("Debug recording initialized", 
+                         details={'file': self.debug_file_path})
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Failed to initialize debug recording",
+                component="debug_recorder"
+            )
+            self.debug_recording = False
+
+    def stop_debug_recording(self):
+        """Enhanced stop debug recording"""
+        try:
+            if self.debug_file:
+                self.debug_file.flush()  # Принудительная запись буфера
+                self.debug_file.close()
+                self.debug_file = None
+            self.debug_recording = False
+            self.recording_stopped = True
+            self.send_log("Debug recording stopped and file closed", level="info")
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Error stopping debug recording",
+                component="debug_recorder"
+            )
+
+    def write_debug_audio(self, audio_chunk):
+        """Write audio chunk to debug file"""
+        try:
+            if self.debug_recording and self.debug_file:
+                self.debug_file.write(audio_chunk)
+                
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Error writing debug audio",
+                component="debug_recorder",
+                chunk_size=len(audio_chunk) if audio_chunk is not None else 0
+            )
+            self.stop_debug_recording()
 
     def process(self, audio_chunk):
-        self.chunk_counter += 1
-        # Уменьшаем интервал с 50 до 10 чанков
-        if self.chunk_counter % 10 == 0:  # Каждые 10 чанков
-            phrase = self.test_phrases[self.chunk_counter % len(self.test_phrases)]
-            self.text_buffer += phrase + " "
-            self.send_data('asr_result', {
-                'text': phrase,
-                'buffer': self.text_buffer,
-                'is_final': False
-            })
-        
-        return None  # ASR не передает аудио дальше
+        """Enhanced process method with controlled recording stop"""
+        try:
+            # Проверяем запрос на остановку записи
+            if self.stop_recording_requested:
+                if self.pipe_input and self.pipe_input.empty():
+                    # Буфер пуст, можно остановить запись
+                    self.stop_debug_recording()
+                    self.stop_recording_requested = False
+                    self.recording_stopped = True
+                    self.send_log("Debug recording completed and file closed", level="info")
+                    return None
+
+            # Записываем входящий аудиопоток если включена отладка
+            if self.debug_recording and not self.recording_stopped:
+                if audio_chunk is not None and len(audio_chunk) > 0:
+                    self.write_debug_audio(audio_chunk)
+
+            self.chunk_counter += 1
+            # Уменьшаем интервал с 50 до 10 чанков
+            if self.chunk_counter % 10 == 0:  # Каждые 10 чанков
+                phrase = self.test_phrases[self.chunk_counter % len(self.test_phrases)]
+                self.text_buffer += phrase + " "
+                self.send_data('asr_result', {
+                    'text': phrase,
+                    'buffer': self.text_buffer,
+                    'is_final': False
+                })
+            
+            return None  # ASR не передает аудио дальше
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Error in ASR processing",
+                level="error",
+                details={
+                    'debug_recording': self.debug_recording,
+                    'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
+                    'stop_requested': self.stop_recording_requested,
+                    'recording_stopped': self.recording_stopped
+                }
+            )
+            return None
+
+    def configure(self):
+        """Enhanced configure method with debug setup"""
+        try:
+            # Инициализируем отладочную запись по умолчанию
+            self.init_debug_recording()
+            self.send_status('configured')
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Failed to configure ASR stage",
+                level="error"
+            )
+
+    def stop(self):
+        """Enhanced stop method"""
+        try:
+            # Ensure all data is written before stopping
+            if self.stop_recording_requested and not self.recording_stopped:
+                self.send_log("Flushing remaining audio data", level="debug")
+                while not self.pipe_input.empty():
+                    if data := self.audio_read():
+                        self.process(data)
+            
+            # Close recording if still active
+            self.stop_debug_recording()
+            
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Error in ASR stop",
+                level="error"
+            )
+
+    def _handle_command(self, command: Dict[str, Any]):
+        """Handle stage commands"""
+        cmd = command.get('command')
+        if cmd == 'stop_recording':
+            self.stop_recording_requested = True
+            self.send_log("Stop recording requested", level="debug")
+        elif cmd == 'start_recording':
+            # Если файл существует, закрываем его
+            self.stop_debug_recording()
+            # Инициализируем новую запись
+            self.init_debug_recording()
+            self.stop_recording_requested = False
+            self.recording_stopped = False
+        else:
+            super()._handle_command(command)
 
     def _run(self):
         self.send_status('starting')
