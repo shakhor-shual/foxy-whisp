@@ -7,6 +7,7 @@ import sounddevice as sd
 import socket
 import time
 import select
+import errno
 from collections import deque
 from multiprocessing import Event
 from scipy.signal import resample
@@ -331,6 +332,10 @@ class TCPSource:
         self.name = "tcp"  # Добавляем имя для логов
         self.debug_enabled = True  # Включаем отладку
         self.source_id = f"tcp_{id(self)}"  # Уникальный идентификатор источника
+        self.port_retry_count = 5  # Number of retries for port binding
+        self.port_retry_delay = 1.0  # Delay between retries in seconds
+        self.bind_timeout = 30.0  # Maximum time to wait for port
+        self._closing = False  # Flag to track graceful shutdown
 
     def _send_message(self, msg_type: MessageType, content: dict):
         """Унифицированный метод отправки сообщений"""
@@ -392,73 +397,105 @@ class TCPSource:
         }
         self._send_message(MessageType.EXCEPTION, content)
 
-    def run(self):
+    def _create_socket(self):
+        """Create and configure TCP socket with proper options"""
         try:
-            # Создаём сокет и настраиваем его
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.bind((self.host, self.port))
-            self.socket.listen(1)
-            self.socket.settimeout(1)
+            # Allow port reuse
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # Non-blocking mode
+            self.socket.setblocking(False)
+            return True
+        except Exception as e:
+            self.send_exception(e, "Failed to create socket")
+            return False
 
-            # Отправляем информацию о запуске
-            self._send_message(
-                MessageType.LOG,
-                {'message': 'TCP server initialized', 'level': 'info'}
-            )
+    def _bind_socket(self):
+        """Attempt to bind socket with retries"""
+        start_time = time.time()
+        retry_count = 0
+        
+        while retry_count < self.port_retry_count:
+            try:
+                self.socket.bind((self.host, self.port))
+                self.socket.listen(1)
+                self.log("info", f"TCP server listening on {self.host}:{self.port}")
+                return True
+            except socket.error as e:
+                if e.errno == errno.EADDRINUSE:
+                    retry_count += 1
+                    self.log("warning", f"Port {self.port} is busy, retry {retry_count}/{self.port_retry_count}")
+                    
+                    # Check if we exceeded timeout
+                    if time.time() - start_time > self.bind_timeout:
+                        self.send_exception(e, f"Failed to bind port {self.port} after timeout")
+                        return False
+                        
+                    time.sleep(self.port_retry_delay)
+                    continue
+                else:
+                    self.send_exception(e, "Socket bind error")
+                    return False
+        
+        self.log("error", f"Failed to bind port {self.port} after {retry_count} retries")
+        return False
 
-            self._send_message(
-                MessageType.LOG,
-                {
-                    'message': f'TCP server listening on {self.host}:{self.port}',
-                    'level': 'info',
-                    'details': {'host': self.host, 'port': self.port}
-                }
-            )
+    def stop(self):
+        """Enhanced stop with graceful shutdown"""
+        self._closing = True
+        try:
+            if self.connection:
+                try:
+                    self.connection.shutdown(socket.SHUT_RDWR)
+                except:
+                    pass
+                self.connection.close()
+                self.connection = None
+                
+            if self.socket:
+                try:
+                    self.socket.shutdown(socket.SHUT_RDWR)
+                except:
+                    pass
+                self.socket.close()
+                self.socket = None
+                
+            self.log("info", "TCP server stopped and resources released")
+            
+        except Exception as e:
+            self.send_exception(e, "Error during TCP shutdown")
+        finally:
+            self._closing = False
 
+    def run(self):
+        """Updated run method with proper error handling"""
+        try:
+            if not self._create_socket() or not self._bind_socket():
+                return
+                
             while not self.stop_event.is_set():
                 try:
-                    self.connection, addr = self.socket.accept()
-                    self.log("info", f"Connected to client", address=addr)
-
-                    while not self.stop_event.is_set():
-                        try:
-                            data = self.connection.recv(self.chunk_size * self.sample_width)
-                            if not data:
+                    ready = select.select([self.socket], [], [], 1.0)
+                    if ready[0]:
+                        self.connection, addr = self.socket.accept()
+                        self.log("info", f"Client connected from {addr}")
+                        
+                        while not self.stop_event.is_set():
+                            if data := self._non_blocking_receive_audio():
+                                self.process_audio_data(data)
+                            else:
                                 break
-
-                            self.internal_queue.append(np.frombuffer(data, dtype=np.int16))
-                        except socket.timeout:
-                            continue
-                        except BrokenPipeError:
-                            self.log("error", "Client disconnected unexpectedly.")
-                            break
-                        except Exception as e:
-                            self.log("error", f"Error receiving audio data: {e}")
-                            break
-
-                    self.connection.close()
-                    self.log("info", "Connection to client closed")
-
-                except socket.timeout:
-                    continue
-                except Exception as e:
-                    self.log("error", f"Error in server loop: {e}")
+                                
+                except socket.error as e:
+                    if self._closing:
+                        break
+                    self.send_exception(e, "Socket error during operation")
                     break
-
+                    
         except Exception as e:
-            self.send_exception(
-                e,
-                "Failed to start TCP server",
-                level="error",
-                component="tcp_server"
-            )
-            raise
+            self.send_exception(e, "TCP server error")
         finally:
-            if self.socket:
-                self.socket.close()
-                self.log("info", "TCP server socket closed")
-
-        self.log("info", "TCP server stopped")
+            self.stop()
 
     def _non_blocking_receive_audio(self):
         """ Receive audio data in a non-blocking manner. """
@@ -480,15 +517,6 @@ class TCPSource:
             
             cycles += 1 # Increment the cycle count if no data is received
         return None  # Return None after timeout
-
-    def stop(self):
-        """Остановка TCP-сервера."""
-        if self.connection:
-            self.connection.close()
-        if self.socket:
-            self.socket.close()
-        # Изменяем уровень лога на info
-        self.log("info", "TCP server stopped and resources released")
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""

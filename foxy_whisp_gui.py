@@ -6,7 +6,8 @@ from tkinter import ttk, filedialog
 import threading
 import argparse
 from logic.foxy_utils import add_shared_args, logger
-#
+import os
+import signal
 from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
 from logic.log_filter import LogFilter
@@ -554,19 +555,38 @@ class FoxyWhispGUI:
         self.advanced_options_visible = not self.advanced_options_visible
 
     def on_close(self):
-        """Enhanced window close handler"""
+        """Enhanced window close handler with timeout"""
         try:
             if self.server_running:
-                # Сначала останавливаем запись
-                self.send_command("stop_recording")
-                # Даем время на финализацию файла
-                time.sleep(0.5)
-                # Затем останавливаем сервер
-                self.send_command("stop")
-                # Ждем завершения
-                time.sleep(0.5)
-        finally:
+                # Signal server to stop
+                self.send_command("shutdown")
+                
+                # Wait briefly for server to acknowledge
+                wait_start = time.time()
+                while self.server_running and time.time() - wait_start < 2.0:
+                    self.root.update()
+                    time.sleep(0.1)
+                
+                # If still running, force close
+                if self.server_running:
+                    self.append_text("[WARNING] Server not responding, forcing shutdown")
+            
+            # Schedule destroy after pending events
+            self.root.after(100, self._force_close)
+            
+        except Exception as e:
+            print(f"Error during close: {e}")
             self.root.destroy()
+
+    def _force_close(self):
+        """Force close the application"""
+        try:
+            self.root.destroy()
+        except:
+            pass
+        finally:
+            # Force exit if needed
+            os._exit(0)
 
     def append_text(self, text: str):
         """Append text with improved message parsing"""
@@ -972,46 +992,73 @@ class FoxyWhispGUI:
 
 
 def main():
+    """Enhanced main with proper cleanup"""
     parser = argparse.ArgumentParser()
     add_shared_args(parser)
     args = parser.parse_args()
 
-    # Создаем очереди
+    # Create queues
     gui_to_server = MPQueue()
     server_to_gui = MPQueue()
+    server_proc = None
 
-    # Создаем и запускаем сервер
-    server = FoxyWhispServer(gui_to_server, server_to_gui, vars(args))
-    server_proc = Process(target=server.run)
-    server_proc.start()
-
-    # Создаем GUI
-    gui = FoxyWhispGUI(gui_to_server, server_to_gui, args, parser)
-    
-    try:
-        gui.run()
-    finally:
+    def cleanup():
+        """Cleanup function for safe shutdown"""
+        nonlocal server_proc
         try:
-            # Отправляем команду shutdown если очередь еще существует
-            if gui_to_server is not None and not gui_to_server._closed:
+            # Send shutdown command if queue is still open
+            if gui_to_server and not gui_to_server._closed:
                 gui_to_server.put({'type': 'command', 'command': 'shutdown'})
+                
+            if server_proc:
+                # Wait briefly for graceful shutdown
+                server_proc.join(timeout=2.0)
+                
+                # Force terminate if still alive
+                if server_proc.is_alive():
+                    server_proc.terminate()
+                    server_proc.join(timeout=1.0)
+                    
+                    # Kill if still not responding
+                    if server_proc.is_alive():
+                        os.kill(server_proc.pid, signal.SIGKILL)
+                
+            # Close queues safely
+            for q in [gui_to_server, server_to_gui]:
+                if q and not q._closed:
+                    q.close()
+                    try:
+                        q.join_thread()  # Add timeout if needed
+                    except:
+                        pass
+                        
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
             
-            # Ждем завершения сервера
-            server_proc.join(timeout=5.0)
-            
-            # Принудительное завершение если не ответил
-            if server_proc.is_alive():
-                server_proc.terminate()
-                server_proc.join(1.0)
         finally:
-            # Безопасное закрытие очередей
-            for queue in [gui_to_server, server_to_gui]:
-                try:
-                    if queue is not None and not queue._closed:
-                        queue.close()
-                        queue.join_thread()
-                except:
-                    pass
+            # Force exit if needed
+            os._exit(0)
+
+    try:
+        # Setup signal handlers
+        signal.signal(signal.SIGINT, lambda sig, frame: cleanup())
+        signal.signal(signal.SIGTERM, lambda sig, frame: cleanup())
+
+        # Create and start server
+        server = FoxyWhispServer(gui_to_server, server_to_gui, vars(args))
+        server_proc = Process(target=server.run)
+        server_proc.start()
+
+        # Create and run GUI
+        gui = FoxyWhispGUI(gui_to_server, server_to_gui, args, parser)
+        gui.run()
+        
+    except Exception as e:
+        print(f"Error in main: {e}")
+        
+    finally:
+        cleanup()
+
 
 if __name__ == "__main__":
     main()

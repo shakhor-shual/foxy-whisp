@@ -143,16 +143,35 @@ class FoxyWhispServer:
 
     ####################
     def _force_shutdown(self):
-        """Аварийное завершение всех процессов сервера"""
+        """Enhanced force shutdown with process cleanup"""
         logger.critical("Force shutdown initiated...")
         
-        # Останавливаем все дочерние процессы (SRC, ASR)
-        for name, proc in self.processes.items():
-            if proc and proc.is_alive():
-                proc.terminate()
-                
-        self._shutdown_requested = True
-        self.stop_event.set()
+        try:
+            # Stop all stages first
+            self.stop_pipeline()
+            
+            # Force terminate processes that didn't stop
+            for name, proc in self.processes.items():
+                if proc and proc.is_alive():
+                    logger.warning(f"Force terminating {name} process")
+                    proc.terminate()
+                    proc.join(timeout=1.0)
+                    
+                    # Kill if still alive
+                    if proc.is_alive():
+                        import signal
+                        os.kill(proc.pid, signal.SIGKILL)
+                        logger.critical(f"Killed {name} process with SIGKILL")
+            
+            # Clear all queues
+            self.queues = PipelineQueues()
+            
+        except Exception as e:
+            logger.error(f"Error during force shutdown: {e}")
+            
+        finally:
+            self._shutdown_requested = True
+            self.stop_event.set()
 
     ####################
     def _init_processes(self):
@@ -493,24 +512,29 @@ class FoxyWhispServer:
 
     ####################
     def _handle_signal(self, signum, frame):
-        """Обработчик сигналов для graceful shutdown"""
-        if self._shutdown_requested:
-            return
-            
-        self._shutdown_requested = True
+        """Enhanced signal handler"""
         sig_name = {signal.SIGINT: "SIGINT", signal.SIGTERM: "SIGTERM"}.get(signum, str(signum))
-        logger.info(f"Received {sig_name}, shutting down...")
+        logger.info(f"Received {sig_name}, initiating shutdown...")
         
-        # Уведомляем GUI о shutdown
-        self._send_gui_message(
-            PipelineMessage.create_status(
-                source='system',
-                status='shutdown',
-                reason=f"Signal {sig_name} received"
-            )
-        )
-
-        self.stop_pipeline()
+        try:
+            # Start shutdown timer
+            import threading
+            timer = threading.Timer(5.0, self._force_shutdown)
+            timer.start()
+            
+            # Try graceful shutdown
+            self.stop_pipeline()
+            
+            # Cancel timer if successful
+            timer.cancel()
+            
+        except Exception as e:
+            logger.error(f"Error during signal handling: {e}")
+            self._force_shutdown()
+        
+        finally:
+            self._shutdown_requested = True
+            self.stop_event.set()
 
     ####################
     def _cleanup(self):
