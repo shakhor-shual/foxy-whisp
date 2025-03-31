@@ -12,8 +12,8 @@ from multiprocessing import Event
 from scipy.signal import resample
 
 class AudioDeviceSource:
-    def __init__(self, samplerate=None, blocksize=32768, device=None, 
-                 accumulation_buffer_size=1, stop_event=None, container=None):
+    def __init__(self, samplerate=None, blocksize=320, device=None, 
+                 accumulation_buffer_size=0.5, stop_event=None, container=None):
         self.samplerate = samplerate
         self.blocksize = blocksize
         self.device = device

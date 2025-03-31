@@ -266,7 +266,7 @@ class SRCstage(PipelineElement):
         self.source = None
         self.vad = WebRTCVAD(aggressiveness=args.get("vad_aggressiveness", 3))
         self.vad.connect_control(self.out_queue)  # Connect VAD to pipeline messaging
-        self.fifo_buffer = AudioBuffer(sample_rate=16000, max_duration=5)
+        self.fifo_buffer = AudioBuffer(sample_rate=16000, max_duration=1)  # Уменьшаем до 1 секунды
         self.vu_meter_threshold = -60  # Минимальный уровень для логирования в дБ
         self.vad_chunks_counter = 0  # Счетчик обработанных VAD чанков
         self.vu_meter_update_interval = 3  # Уменьшаем интервал обновления

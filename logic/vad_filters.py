@@ -195,11 +195,14 @@ class WebRTCVAD(VADBase):
     def __init__(self, aggressiveness=3):
         super().__init__()
         self.vad = webrtcvad.Vad(aggressiveness)
-        self.aggressiveness = aggressiveness  # Сохраняем значение напрямую
+        self.aggressiveness = aggressiveness
         self.sample_rate = 16000
-        self.frame_duration = 30
+        self.frame_duration = 20  # Уменьшаем до 20мс
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
         self.min_speech_frames = 1
+        self.speech_history = []  # Добавляем историю детекции
+        self.history_size = 3     # Размер истории в фреймах
+        self.sensitivity = 0.2    # Уменьшаем порог до 20%
 
     def get_chunk_size(self):
         """Возвращает размер чанка для WebRTC VAD."""
@@ -208,10 +211,10 @@ class WebRTCVAD(VADBase):
     def get_config(self):
         """Возвращает конфигурацию WebRTC VAD"""
         return {
-            'aggressiveness': self.aggressiveness,  # Используем сохраненное значение
+            'aggressiveness': self.aggressiveness,
             'sample_rate': self.sample_rate,
             'frame_duration': self.frame_duration,
-            'frame_size': self.get_chunk_size()  # Используем метод вместо прямого доступа
+            'frame_size': self.get_chunk_size()
         }
 
     def send_exception(self, e: Exception, message: str = None, **kwargs):
@@ -226,7 +229,7 @@ class WebRTCVAD(VADBase):
             self.send_status('error', **error_details)
 
     def detect_voice(self, audio_chunk):
-        """Анализ аудиоданных с использованием WebRTC VAD."""
+        """Анализ аудиоданных с улучшенной чувствительностью"""
         start_time = time.time()
         try:
             # Проверка и преобразование входных данных
@@ -252,23 +255,28 @@ class WebRTCVAD(VADBase):
             frame_length = num_frames * self.frame_size
             frames = np.array_split(audio_int16[:frame_length], num_frames)
 
-            # Подсчет фреймов с речью
-            speech_frames = sum(
-                1 for frame in frames 
-                if len(frame) == self.frame_size and 
-                self.vad.is_speech(frame.tobytes(), self.sample_rate)
-            )
+            # Обновляем историю детекции 
+            is_speech = False
+            for frame in frames:
+                if len(frame) == self.frame_size:
+                    frame_has_speech = self.vad.is_speech(frame.tobytes(), self.sample_rate)
+                    self.speech_history.append(frame_has_speech)
+                    # Оставляем только последние N фреймов
+                    self.speech_history = self.speech_history[-self.history_size:]
+                    
+                    # Проверяем историю для принятия решения 
+                    if len(self.speech_history) >= self.history_size:
+                        speech_ratio = sum(self.speech_history) / len(self.speech_history)
+                        is_speech = speech_ratio >= self.sensitivity
+                        if is_speech:
+                            break
 
-            # Вычисляем соотношение речи
-            speech_ratio = speech_frames / num_frames if num_frames > 0 else 0
-            is_speech = speech_ratio >= 0.3
-
-            # Принудительно отправляем статус для каждого чанка
+            # Отправляем статус
             processing_time = time.time() - start_time
             self.send_status(
                 "processing",
-                frames_total=num_frames,
-                frames_with_speech=speech_frames,
+                frames_total=len(frames),
+                frames_with_speech=sum(self.speech_history),
                 frame_size=self.frame_size,
                 voice_detected=is_speech,
                 performance={'processing_time_ms': processing_time * 1000}
@@ -279,7 +287,7 @@ class WebRTCVAD(VADBase):
         except Exception as e:
             import traceback
             self.send_exception(
-                e,
+                e, 
                 "VAD processing error",
                 traceback=traceback.format_exc(),
                 frame_info={
