@@ -196,89 +196,56 @@ class SRCstage(PipelineElement):
         """Отправка сообщения об уровне сигнала"""
         current_time = time.time()
         if current_time - self.last_level_msg_time >= self.min_level_update_interval:
-            message = {
-                'data_type': 'audio_level',
-                'payload': {
-                    'level': 0 if is_silence else level,
-                    'timestamp': current_time,
-                    'is_silence': is_silence
-                }
-            }
-            if self.out_queue:
-                self.send_data('audio_level', message['payload'])
+            # Нормализуем уровень в диапазон 0-100
+            normalized_level = min(max(int(level), 0), 100)
+            
+            self.send_data('audio_level', {
+                'level': normalized_level,
+                'timestamp': current_time,
+                'is_silence': is_silence
+            })
             self.last_level_msg_time = current_time
 
     def process(self, audio_chunk):
-        """Добавление данных в FIFO буфер и обработка через VAD."""
+        """Обработка аудиоданных."""
         try:
-            # Сначала нормализуем входные данные до диапазона [-1, 1]
+            # Проверка входных данных
+            if audio_chunk is None or not isinstance(audio_chunk, np.ndarray):
+                return None
+
+            # Нормализация до float32 [-1, 1]
             if audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
-                audio_chunk = audio_chunk / 32768.0  # нормализация из int16
+            if np.abs(audio_chunk).max() > 1.0:
+                audio_chunk = audio_chunk / 32768.0
 
-            # Измеряем уровень входного сигнала
-            level = calculate_vu_meter(audio_chunk)
+            # Измерение уровня входного сигнала
+            level = int(calculate_vu_meter(audio_chunk))
+            
+            # Отправка уровня сигнала
+            if self.vad_chunks_counter % self.vu_meter_update_interval == 0:
+                self.send_level_message(level)
 
-            # Ресэмплинг аудиоданных до 16 кГц
+            # Ресэмплинг до 16 кГц если нужно
             audio_chunk = self._resample_to_16k(audio_chunk)
 
-            # Добавление данных в буфер
+            # Добавление в буфер
             self.fifo_buffer.add_data(audio_chunk)
-            vad_chunk_size = self.vad.get_chunk_size()
-
-            # Check VAD status messages and forward them
-            vad_status = self.vad.get_status()
-            if vad_status:
-                self.send_status('vad_status', **vad_status)
-
-            chunks_processed = 0
-            voice_chunks_detected = 0
-            have_data = False
-
-            while True:
-                chunk = self.fifo_buffer.get_chunk(vad_chunk_size)
-                if chunk is None:
-                    if not have_data:
-                        # Если не смогли получить ни одного чанка, отправляем нулевой уровень
-                        self.send_level_message(0.0, is_silence=True)
-                    break
-
-                have_data = True
-                chunks_processed += 1
-                self.vad_chunks_counter += 1
-                
-                # Измеряем уровень каждого чанка
-                chunk_level = calculate_vu_meter(chunk)
-                
-                # Отправляем информацию об уровне чаще
-                if self.vad_chunks_counter % self.vu_meter_update_interval == 0:
-                    self.send_level_message(chunk_level)
-
-                # Проверка на голос
+            
+            # Обработка данных из буфера
+            processed = False
+            while chunk := self.fifo_buffer.get_chunk(self.vad.frame_size):
+                processed = True
                 if self.vad.detect_voice(chunk):
-                    voice_chunks_detected += 1                    
                     self.audio_write(chunk)
-                    # Статистика только для голосовых чанков
-                    self.send_data('audio_chunk', {
-                        'size': len(chunk),
-                        'voice_detected': True,
-                        'stats': {
-                            'total_chunks': chunks_processed,
-                            'voice_chunks': voice_chunks_detected,
-                            'level': float(chunk_level)
-                        }
-                    })
 
-            # Forward level messages from source
-            if hasattr(self.source, 'last_level'):
-                self.send_data('audio_level', {'level': self.source.last_level})
+            if not processed:
+                self.send_level_message(0, is_silence=True)
 
-            # Если данных больше нет в буфере, отправляем сообщение о тишине
-            if not have_data:
-                self.send_level_message(0.0, is_silence=True)
+            return None
 
         except Exception as e:
-            self.send_log(f"Process error: {e}", level="error")
+            self.send_log(f"Process error: {str(e)}", level="error")
             raise
 
     def _resample_to_16k(self, audio_chunk):

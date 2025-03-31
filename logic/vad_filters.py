@@ -146,51 +146,59 @@ class WebRTCVAD(VADBase):
     def __init__(self, aggressiveness=3):
         super().__init__()
         self.vad = webrtcvad.Vad(aggressiveness)
-        self.sample_rate = 16000  # WebRTC VAD поддерживает только 16 кГц
-        self.frame_duration = 30  # Длительность фрейма в миллисекундах
+        self.sample_rate = 16000
+        self.frame_duration = 30
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
+        self.min_speech_frames = 1  # Минимальное количество фреймов с речью
 
     def detect_voice(self, audio_chunk):
         """Анализ аудиоданных с использованием WebRTC VAD."""
         try:
-            # Преобразование данных в формат int16
-            audio_chunk = (audio_chunk * 32767).astype(np.int16)
-
-            # Проверка длины данных и логирование
-            if len(audio_chunk) < self.frame_size:
-                self.send_status("error", 
-                               error="insufficient_data",
-                               required=self.frame_size,
-                               received=len(audio_chunk))
+            # Проверка и преобразование входных данных
+            if not isinstance(audio_chunk, np.ndarray):
                 return False
 
-            # Убедимся, что длина данных кратна размеру фрейма
-            audio_chunk = audio_chunk[: len(audio_chunk) // self.frame_size * self.frame_size]
+            # Нормализация до float32 [-1, 1]
+            if audio_chunk.dtype != np.float32:
+                audio_chunk = audio_chunk.astype(np.float32)
+            if np.abs(audio_chunk).max() > 1.0:
+                audio_chunk = audio_chunk / 32768.0
 
-            # Разделение данных на фреймы
-            frames = [
-                audio_chunk[i : i + self.frame_size]
-                for i in range(0, len(audio_chunk), self.frame_size)
-            ]
+            # Преобразование в int16 для VAD
+            audio_int16 = (audio_chunk * 32767).astype(np.int16)
+            
+            # Проверка длины данных
+            if len(audio_int16) < self.frame_size:
+                return False
 
-            # Анализ каждого фрейма с логированием результатов
-            results = [self.vad.is_speech(frame.tobytes(), self.sample_rate) 
-                      for frame in frames]
+            # Разделение на фреймы фиксированного размера
+            num_frames = len(audio_int16) // self.frame_size
+            frames = np.array_split(audio_int16[:num_frames * self.frame_size], num_frames)
 
-            # Send more detailed status
+            # Подсчет фреймов с речью
+            speech_frames = 0
+            for frame in frames:
+                try:
+                    if self.vad.is_speech(frame.tobytes(), self.sample_rate):
+                        speech_frames += 1
+                except Exception as e:
+                    self.send_status("frame_error", error=str(e))
+                    continue
+
+            # Отправка статистики
             self.send_status(
                 "processing",
-                speech_detected=any(results),
                 frames_total=len(frames),
-                frames_with_speech=sum(results)
+                frames_with_speech=speech_frames,
+                frame_size=self.frame_size
             )
-            
-            return any(results)
-            
+
+            # Определяем наличие речи по количеству фреймов
+            return speech_frames >= self.min_speech_frames
+
         except Exception as e:
             self.send_status("error", error=str(e))
             return False
-
 
     def get_chunk_size(self):
         """Возвращает размер чанка для WebRTC VAD."""

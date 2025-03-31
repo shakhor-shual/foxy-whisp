@@ -1,4 +1,4 @@
-=== New Session Пн 31 мар 2025 08:33:47 CEST ===
+=== New Session Пн 31 мар 2025 08:41:04 CEST ===
 Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 /home/ubuntu/foxy-whisp/logic/foxy_whisp_gui.py
 [SERVER] Sent test message #0
@@ -6,411 +6,211 @@ AudioDeviceSource: Message sent: MessageType.STATUS, Content: {'status': 'starti
 AudioDeviceSource: Message sent: MessageType.LOG, Content: {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None}}
 AudioDeviceSource Log: [info] Audio stream started {'samplerate': 16000, 'blocksize': 320, 'device': None}
 AudioDeviceSource: Message sent: MessageType.STATUS, Content: {'status': 'configured', 'details': {}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 7, 'timestamp': 1743402830.956645, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 10, 'timestamp': 1743402831.0633101, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743402831.1699686, 'is_silence': False}}
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743402830.8379757}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.5072389, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.6139271, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743403267.7206297, 'is_silence': False}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743403267.3779354}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info'}, 'timestamp': 1743402830.8397481}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info'}, 'timestamp': 1743403267.3794568}
 [GUI] Test message received: Test message #0 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #0 from server
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743402831.2766452, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 10, 'timestamp': 1743402831.3833823, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743402831.4899879, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743402831.5966394, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743402831.7033558, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743402831.8099198, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743403267.8273492, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 6, 'timestamp': 1743403267.9339294, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.0406032, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.1472654, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743403268.2539995, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743403268.3605902, 'is_silence': False}}
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'server_initialized', Message: 'server_initialized', Filters: set()
 [DEBUG] Message accepted - server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #0 from server', Filters: set()
 [DEBUG] Message accepted - test
 [SERVER] Processing message from GUI: MessageType.COMMAND
 [SERVER] Received command: get_audio_devices
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743402831.8654835}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743403268.4043179}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
 [DEBUG] Message accepted - server
 AudioDeviceSource: Message sent: MessageType.LOG, Content: {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1}}
 AudioDeviceSource Log: [debug] Buffer accumulated {'size': 320, 'queue_size': 1}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 14, 'timestamp': 1743402831.916922, 'is_silence': False}}
+AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 8, 'timestamp': 1743403268.467222, 'is_silence': False}}
 [SERVER] Processing message from src: MessageType.LOG
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743402830.841303}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743403267.3807557}
 [GUI] Processing message - Type: MessageType.LOG, Source: src
 [GUI] Formatted log message: [src.info] SRC stage initialized
 [SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 215356)', 'level': 'info'}, 'timestamp': 1743402830.8494983}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 229969)', 'level': 'info'}, 'timestamp': 1743403267.3892155}
 [GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] Process started (PID: 215356)
+[GUI] Formatted log message: [src.info] Process started (PID: 229969)
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743402831.9679284}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src[SERVER] Processing message from src: MessageType.STATUS
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
-[DEBUG] Message accepted - src
-
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info'}, 'timestamp': 1743402830.8517387}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.5062685}
+[GUI] Processing message - Type: MessageType.STATUS, Source: src
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info'}, 'timestamp': 1743403267.3919024}
 [GUI] Processing message - Type: MessageType.LOG, Source: src
 [GUI] Formatted log message: [src.info] Configuring audio_device source
-[SERVER] Processing message from src: MessageType.STATUS[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743402831.9685555}
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.5067382}
 [GUI] Processing message - Type: MessageType.STATUS, Source: src
-
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None}}, 'timestamp': 1743402830.884816}
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 215356)', Filters: set()
-[DEBUG] Message accepted - src[GUI] Processing message - Type: MessageType.LOG, Source: src
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None}}, 'timestamp': 1743403267.420945}
+[GUI] Processing message - Type: MessageType.LOG, Source: src
 [GUI] Formatted log message: [src.info] Audio stream started
 [SERVER] Processing message from src: MessageType.STATUS
-
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743402831.969255}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743402831.9697418}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.5072243}
 [GUI] Processing message - Type: MessageType.STATUS, Source: src
 [SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.5075457}
+[GUI] Processing message - Type: MessageType.STATUS, Source: src
 [SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743402830.884997}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743403267.4210637}
 [GUI] Processing message - Type: MessageType.LOG, Source: src
 [GUI] Formatted log message: [src.info] SRC stage configured and running
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
-[DEBUG] Message accepted - src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 7, 'timestamp': 1743402830.956645, 'is_silence': False}}, 'timestamp': 1743402831.9703453}
-[GUI] Processing message - Type: MessageType.DATA, Source: src[SERVER] Processing message from src: MessageType.DATA
-
-[GUI.DEBUG] Received audio level: {'level': 7, 'timestamp': 1743402830.956645, 'is_silence': False}
-[SERVER] Processing message from src: MessageType.DATA
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Configuring audio_device source', Filters: set()
-[DEBUG] Message accepted - src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 10, 'timestamp': 1743402831.0633101, 'is_silence': False}}, 'timestamp': 1743402831.970742}[SERVER] Processing message from src: MessageType.DATA
+[SERVER] Processing message from src: MessageType.DATA[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.5072389, 'is_silence': False}}, 'timestamp': 1743403268.5079951}
 
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 10, 'timestamp': 1743402831.0633101, 'is_silence': False}
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743402831.1699686, 'is_silence': False}}, 'timestamp': 1743402831.971081}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.6139271, 'is_silence': False}}, 'timestamp': 1743403268.50834}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
 [SERVER] Processing message from src: MessageType.DATA
-[GUI.DEBUG] Received audio level: {'level': 13, 'timestamp': 1743402831.1699686, 'is_silence': False}
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
-[DEBUG] Message accepted - src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743402831.2766452, 'is_silence': False}}, 'timestamp': 1743402831.9714692}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743403267.7206297, 'is_silence': False}}, 'timestamp': 1743403268.5086076}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 15, 'timestamp': 1743402831.2766452, 'is_silence': False}
 [SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 10, 'timestamp': 1743402831.3833823, 'is_silence': False}}, 'timestamp': 1743402831.9718964}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743403267.8273492, 'is_silence': False}}, 'timestamp': 1743403268.5088825}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 10, 'timestamp': 1743402831.3833823, 'is_silence': False}[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Audio stream started', Filters: set()
-
-[DEBUG] Message accepted - src
 [SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743402831.4899879, 'is_silence': False}}, 'timestamp': 1743402831.972356}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 6, 'timestamp': 1743403267.9339294, 'is_silence': False}}, 'timestamp': 1743403268.5092177}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 12, 'timestamp': 1743402831.4899879, 'is_silence': False}
-[SERVER] Processing message from src: MessageType.DATA[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743402831.5966394, 'is_silence': False}}, 'timestamp': 1743402831.9727263}
-
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 12, 'timestamp': 1743402831.5966394, 'is_silence': False}
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
-[DEBUG] Message accepted - src
 [SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743402831.7033558, 'is_silence': False}}, 'timestamp': 1743402831.973018}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.0406032, 'is_silence': False}}, 'timestamp': 1743403268.509514}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 13, 'timestamp': 1743402831.7033558, 'is_silence': False}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.1472654, 'is_silence': False}}, 'timestamp': 1743403268.5096931}
+[GUI] Processing message - Type: MessageType.DATA, Source: src
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743403268.2539995, 'is_silence': False}}, 'timestamp': 1743403268.510001}
+[GUI] Processing message - Type: MessageType.DATA, Source: src
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743402831.8099198, 'is_silence': False}}, 'timestamp': 1743402831.973351}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743403268.3605902, 'is_silence': False}}, 'timestamp': 1743403268.5102525}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 11, 'timestamp': 1743402831.8099198, 'is_silence': False}
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
-[DEBUG] Message accepted - src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1}}, 'timestamp': 1743402831.9115963}[SERVER] Processing message from src: MessageType.DATA
-
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1}}, 'timestamp': 1743403268.4531589}
 [GUI] Processing message - Type: MessageType.LOG, Source: src
 [GUI] Formatted log message: [src.debug] Buffer accumulated
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 14, 'timestamp': 1743402831.916922, 'is_silence': False}}, 'timestamp': 1743402831.9739804}[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage configured and running', Filters: set()
-
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 8, 'timestamp': 1743403268.467222, 'is_silence': False}}, 'timestamp': 1743403268.510854}
 [GUI] Processing message - Type: MessageType.DATA, Source: src
-[GUI.DEBUG] Received audio level: {'level': 14, 'timestamp': 1743402831.916922, 'is_silence': False}
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
 [DEBUG] Message accepted - src
-Exception in Tkinter callback
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 229969)', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Configuring audio_device source', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Audio stream started', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
+[DEBUG] Message accepted - src
+[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage configured and running', Filters: set()
+[DEBUG] Message accepted - src
 [SERVER] Processing message from src: MessageType.LOG
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error', 'details': {'exception_type': 'ValueError'}}, 'timestamp': 1743402831.9790728}[SERVER] Processing message from src: MessageType.LOG
-
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error'}, 'timestamp': 1743402831.980677}
-[GUI] Processing message - Type: MessageType.LOG, Source: server
-[GUI] Formatted log message: [server.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-Traceback (most recent call last):
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'error', 'details': {'error': 'The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()'}}, 'timestamp': 1743402831.9811742}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage stopping', 'level': 'info'}, 'timestamp': 1743402831.9791808}
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] SRC stage stopping
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'stopped', 'details': {}}, 'timestamp': 1743402831.981795}
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 7, 'timestamp': 1743402830.956645, 'is_s"
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 10, 'timestamp': 1743402831.0633101, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 13, 'timestamp': 1743402831.1699686, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 15, 'timestamp': 1743402831.2766452, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 10, 'timestamp': 1743402831.3833823, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 12, 'timestamp': 1743402831.4899879, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 12, 'timestamp': 1743402831.5966394, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 13, 'timestamp': 1743402831.7033558, 'is"
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 11, 'timestamp': 1743402831.8099198, 'is"
 [DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'debug', Message: 'Buffer accumulated', Filters: set()
 [DEBUG] Message accepted - src
-Exception in Tkinter callback
-Traceback (most recent call last):
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1967, in __call__
-    return self.func(*args)
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 861, in callit
-    func(*args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 698, in process_message_queue
-    self.update_audio_level(args)
-  File "/home/ubuntu/foxy-whisp/foxy_whisp_gui.py", line 170, in update_audio_level
-    self.level_bar["value"] = level
-    ~~~~~~~~~~~~~~^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1732, in __setitem__
-    self.configure({key: value})
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1721, in configure
-    return self._configure('configure', cnf, kw)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/tkinter/__init__.py", line 1711, in _configure
-    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
-_tkinter.TclError: expected floating-point number but got "{'level': 14, 'timestamp': 1743402831.916922, 'is_"
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error', 'details': {'exception_type': 'ValueError'}}, 'timestamp': 1743403268.514984}
+[GUI] Processing message - Type: MessageType.LOG, Source: src
+[GUI] Formatted log message: [src.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error'}, 'timestamp': 1743403268.5164452}
+[GUI] Processing message - Type: MessageType.LOG, Source: server
+[GUI] Formatted log message: [server.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'error', 'details': {'error': 'The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()'}}, 'timestamp': 1743403268.516941}
+[GUI] Processing message - Type: MessageType.STATUS, Source: src
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage stopping', 'level': 'info'}, 'timestamp': 1743403268.5150921}
+[GUI] Processing message - Type: MessageType.LOG, Source: src
+[GUI] Formatted log message: [src.info] SRC stage stopping[SERVER] Processing message from src: MessageType.STATUS
+
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'stopped', 'details': {}}, 'timestamp': 1743403268.5174391}
+[GUI] Processing message - Type: MessageType.STATUS, Source: src
 [DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'error', Message: 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', Filters: set()
 [DEBUG] Message accepted - src
 [DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'error', Message: 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', Filters: set()
 [DEBUG] Message accepted - server
-[SERVER] Processing message from asr: MessageType.LOG
 [DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'error', Message: 'error (error=The truth value of an array with more than one element is ambiguous. Use a.any() or a.all())', Filters: set()
 [DEBUG] Message accepted - src
-[SERVER] Processing message from asr: MessageType.LOG
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743402830.842024}[SERVER] Processing message from asr: MessageType.STATUS
 [DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage stopping', Filters: set()
-
 [DEBUG] Message accepted - src
-[GUI] Processing message - Type: MessageType.LOG, Source: asr
-[GUI] Formatted log message: [asr.info] ASR stage initialized
-[SERVER] Processing message from asr: MessageType.STATUS[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 215367)', 'level': 'info'}, 'timestamp': 1743402831.3649323}
-
-[GUI] Processing message - Type: MessageType.LOG, Source: asr
-[GUI] Formatted log message: [asr.info] Process started (PID: 215367)
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743402832.0829587}
-[GUI] Processing message - Type: MessageType.STATUS, Source: asr
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743402832.0833325}
-[GUI] Processing message - Type: MessageType.STATUS, Source: asr
 [DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'stopped', Message: 'stopped', Filters: set()
 [DEBUG] Message accepted - src
+[SERVER] Processing message from asr: MessageType.LOG
+[SERVER] Processing message from asr: MessageType.LOG
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743403267.3816166}
+[GUI] Processing message - Type: MessageType.LOG, Source: asr
+[GUI] Formatted log message: [asr.info] ASR stage initialized
+[SERVER] Processing message from asr: MessageType.STATUS
+[SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 230050)', 'level': 'info'}, 'timestamp': 1743403267.9036975}
+[GUI] Processing message - Type: MessageType.LOG, Source: asr
+[GUI] Formatted log message: [asr.info] Process started (PID: 230050)
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.618332}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asr
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.6186862}
+[GUI] Processing message - Type: MessageType.STATUS, Source: asr
 [DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
 [DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 215367)', Filters: set()
+[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 230050)', Filters: set()
 [DEBUG] Message accepted - asr
 [DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
 [DEBUG] Message accepted - asr
 [DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'configured', Message: 'configured', Filters: set()
 [DEBUG] Message accepted - asr
 [SERVER] Sent test message #1
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info'}, 'timestamp': 1743402835.840111}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info'}, 'timestamp': 1743403272.3811991}
 [GUI] Test message received: Test message #1 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #1 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #1 from server', Filters: set()
 [DEBUG] Message accepted - test
+[GUI.DEBUG] Starting recording
 [SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: stop
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743402839.0983279}
+[SERVER] Received command: start_recording
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'recording_started', 'details': {}}, 'timestamp': 1743403273.2290716}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopping', Message: 'pipeline_stopping', Filters: set()
-[DEBUG] Message accepted - server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743402839.2011657}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_stopped', Message: 'pipeline_stopped (details={'state': 'stopped'})', Filters: set()
+[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'recording_started', Message: 'recording_started', Filters: set()
 [DEBUG] Message accepted - server
 [SERVER] Sent test message #2
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info'}, 'timestamp': 1743402840.8403485}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info'}, 'timestamp': 1743403277.3815258}
 [GUI] Test message received: Test message #2 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #2 from server
 [DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #2 from server', Filters: set()
 [DEBUG] Message accepted - test
 [SERVER] Sent test message #3
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info'}, 'timestamp': 1743402845.8406458}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info'}, 'timestamp': 1743403282.3818045}
 [GUI] Test message received: Test message #3 from server
 [GUI] Processing message - Type: MessageType.LOG, Source: test
 [GUI] Formatted log message: [test.info] Test message #3 from server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743402848.1583476}
+[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #3 from server', Filters: set()
+[DEBUG] Message accepted - test
+[SERVER] Processing message from GUI: MessageType.COMMAND
+[SERVER] Received command: stop
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743403283.7113235}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743402848.1584566}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743403283.9325573}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743402848.258821}
+[SERVER] Sent test message #4
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #4 from server', 'level': 'info'}, 'timestamp': 1743403287.3820984}
+[GUI] Test message received: Test message #4 from server
+[GUI] Processing message - Type: MessageType.LOG, Source: test
+[GUI] Formatted log message: [test.info] Test message #4 from server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743403288.7882397}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743403288.78839}
+[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743403288.888696}
 [GUI] Processing message - Type: MessageType.STATUS, Source: server

@@ -165,9 +165,18 @@ class FoxyWhispGUI:
         )
         self.level_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-    def update_audio_level(self, level):
-        """Update audio level meter"""
-        self.level_bar["value"] = level
+    def update_audio_level(self, level_data):
+        """Update audio level meter.
+        Args:
+            level_data: dict with keys 'level', 'timestamp', 'is_silence'
+        """
+        try:
+            if isinstance(level_data, dict):
+                level = level_data.get('level', 0)
+                if isinstance(level, (int, float)):
+                    self.level_bar["value"] = level
+        except Exception as e:
+            print(f"[GUI.ERROR] Failed to update audio level: {e}")
 
     def create_text_area(self):
         """Create text display area with controls"""
@@ -653,7 +662,10 @@ class FoxyWhispGUI:
             data_type = msg.content.get('data_type')
             payload = msg.content.get('payload')
             
-            if data_type == 'audio_devices':
+            if data_type == 'audio_level':
+                if isinstance(payload, dict):
+                    self.message_queue.put(('update_audio', payload))
+            elif data_type == 'audio_devices':
                 # Update devices list in combobox
                 devices = payload.get('devices', [])
                 input_devices = [f"{d['name']} (ID: {d['index']})" for d in devices]
@@ -666,9 +678,6 @@ class FoxyWhispGUI:
                     self.args.audio_device = default_device['index']
             elif data_type == 'transcription':
                 self.append_text_safe(f"TRANSCRIPT: {payload}")
-            elif data_type == 'audio_level':
-                print(f"[GUI.DEBUG] Received audio level: {payload}")  # Отладка
-                self.update_audio_level_safe(payload)
             elif data_type == 'log':
                 self.append_text_safe(f"TEST: {payload}")
                 
