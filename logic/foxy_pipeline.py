@@ -432,7 +432,10 @@ class SRCstage(PipelineElement):
                     self.send_log("Processing paused", level="debug")
                     time.sleep(0.1)
                     continue
-                if audio_data := self.source.receive_audio():
+                
+                # Исправляем проблемное место
+                audio_data = self.source.receive_audio()
+                if audio_data is not None and audio_data.size > 0:  # Правильная проверка numpy array
                     self.send_log("Received audio data", level="debug", 
                                   details={"data_size": len(audio_data)})
                     self.process(audio_data)

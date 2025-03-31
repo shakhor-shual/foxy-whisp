@@ -241,14 +241,14 @@ class AudioDeviceSource:
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
         try:
-            if len(self.internal_queue) > 0:  # Заменяем прямую проверку на len()
+            if len(self.internal_queue) > 0:
                 data = self.internal_queue.popleft()
                 # Проверяем что данные валидны
                 if not isinstance(data, np.ndarray):
                     raise ValueError("Invalid audio data type")
                 if data.size == 0:
                     raise ValueError("Empty audio data")
-                return data
+                return data if data.size > 0 else None  # Явно проверяем размер массива
             return None
         except Exception as e:
             self.send_exception(
@@ -453,6 +453,16 @@ class TCPSource:
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
-        if self.internal_queue:
-            return self.internal_queue.popleft()
-        return None
+        try:
+            if self.internal_queue:
+                data = self.internal_queue.popleft()
+                # Проверяем что данные валидны
+                if not isinstance(data, np.ndarray):
+                    raise ValueError("Invalid audio data type")
+                if data.size == 0:
+                    raise ValueError("Empty audio data")
+                return data if data.size > 0 else None  # Явно проверяем размер массива
+            return None
+        except Exception as e:
+            self.log("error", f"Error receiving audio data: {e}")
+            return None

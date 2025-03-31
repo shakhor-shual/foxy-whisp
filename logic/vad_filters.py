@@ -169,13 +169,17 @@ class WebRTCVAD(VADBase):
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
         self.min_speech_frames = 1  # Минимальное количество фреймов с речью
 
+    def get_chunk_size(self):
+        """Возвращает размер чанка для WebRTC VAD."""
+        return int(self.sample_rate * self.frame_duration / 1000)
+
     def get_config(self):
         """Возвращает конфигурацию WebRTC VAD"""
         return {
             'aggressiveness': self.vad.mode,
             'sample_rate': self.sample_rate,
             'frame_duration': self.frame_duration,
-            'frame_size': self.frame_size
+            'frame_size': self.get_chunk_size()  # Используем метод вместо прямого доступа
         }
 
     def detect_voice(self, audio_chunk):
