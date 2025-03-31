@@ -671,7 +671,6 @@ class FoxyWhispGUI:
                                   f"Context: {error_context}")
 
     def handle_status_message(self, msg: PipelineMessage):
-        """Handle status updates from server"""
         try:
             status = msg.content.get('status', '')
             source = msg.source.lower()
@@ -684,6 +683,12 @@ class FoxyWhispGUI:
                 # Явно запрашиваем состояние источника
                 self.send_command("get_source_status")
                 
+            elif status == 'configured':
+                if source.startswith('src'):
+                    self.source_initialized = True
+                    # Запрашиваем состояние повторно после конфигурации
+                    self.send_command("get_source_status")
+                    
             elif status == 'pipeline_started':
                 self.server_running = True
                 self.message_queue.put(('update_button', (self.server_btn, {'text': "Стоп", 'state': 'normal'})))
@@ -756,27 +761,22 @@ class FoxyWhispGUI:
                     is_active = self.source_state.get('active', False)
                     is_configured = self.source_state.get('is_configured', False)
                     
-                    # Обновляем состояние кнопки в зависимости от статуса
-                    button_states = {
-                        'stopped': ('normal', 'Start Recording', False),
-                        'ready': ('normal', 'Start Recording', False),
-                        'starting': ('disabled', 'Starting...', False),
-                        'recording': ('normal', 'Stop Recording', True),
-                        'stopping': ('disabled', 'Stopping...', True),
-                        'error': ('disabled', 'Error', False)
-                    }
-                    
-                    if recording_state in button_states:
-                        state, text, is_recording = button_states[recording_state]
-                        if is_configured or recording_state == 'error':
-                            self.recording = is_recording
-                            self.record_btn.config(state=state, text=text)
-                    
-                    # Обновляем индикаторы
-                    if not is_active:
-                        self.level_bar["value"] = 0
-                        self.message_queue.put(('update_vad', False))
-                    
+                    # Немедленно обновляем состояние если источник сконфигурирован
+                    if is_configured:
+                        self.recording = recording_state == "recording"
+                        
+                        # Принудительно обновляем кнопку через очередь сообщений
+                        button_config = {
+                            'state': 'normal',
+                            'text': "Stop Recording" if self.recording else "Start Recording"
+                        }
+                        self.message_queue.put(('update_button', (self.record_btn, button_config)))
+                        
+                        # Обновляем индикаторы
+                        if not is_active:
+                            self.level_bar["value"] = 0
+                            self.message_queue.put(('update_vad', False))
+
                     # Обрабатываем информацию об устройстве
                     if 'current_device' in payload:
                         self.update_device_info(payload['current_device'])

@@ -365,13 +365,17 @@ class SRCstage(PipelineElement):
             # После успешной конфигурации:
             self._is_configured = True
             self._source_active = True  # Источник сконфигурирован и активен
-            self._recording_state = "ready"  # Новое состояние готовности
+            self._recording_state = "recording"  # Меняем на recording вместо ready
             
-            # Отправляем обновленный статус
+            # Сразу активируем источник
+            if hasattr(self.source, 'run'):
+                self.source.run()
+            
+            # Отправляем обновленный статус с правильным состоянием
             self.send_source_status()
             self.send_status('configured')
             
-            # Отправляем начальное состояние
+            # Отправляем начальное состояние с активной записью
             self.send_initial_state()
 
         except Exception as e:
@@ -383,20 +387,18 @@ class SRCstage(PipelineElement):
 
     def send_initial_state(self):
         """Send complete initial state after configuration"""
-        # Отправляем полное состояние источника
-        self.send_source_status()
-        
-        # Отправляем начальные значения индикаторов
-        self.send_data('audio_level', {
-            'level': 0,
-            'timestamp': time.time(),
-            'is_silence': True
-        })
-        
-        self.send_data('vad_status', {
-            'active': False,
-            'voice_detected': False
-        })
+        # Отправляем полное состояние источника с флагом активной записи
+        current_state = {
+            'active': True,
+            'current_device': self._current_device,
+            'recording_state': "recording",
+            'is_configured': True,
+            'available_devices': AudioDeviceSource.get_audio_devices() 
+                               if hasattr(self.source, 'device') 
+                               else None
+        }
+        self.send_data('source_status', current_state)
+        self._last_sent_state = current_state.copy()
 
     def send_source_status(self):
         """Send current source status with state"""
