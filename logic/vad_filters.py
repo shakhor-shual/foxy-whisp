@@ -72,9 +72,9 @@ class VADBase(ABC):
         self.min_status_interval = 0.03  # Увеличиваем частоту до ~33 Hz
         self.vad_id = f"vad_{id(self)}"  # Уникальный идентификатор VAD
         self.vad_type = self.__class__.__name__
-        # Добавляем параметры для плавного затухания
-        self.fade_frames = 20  # Количество фреймов для затухания
-        self.current_fade_counter = 0  # Текущий счетчик затухания
+        # Параметры затухания в миллисекундах
+        self.fade_time_ms = 500  # Время затухания в миллисекундах (default 500ms)
+        self.current_fade_counter = 0  # Текущий счетчик затухания в фреймах
         self.is_fading = False  # Флаг состояния затухания
         self.last_voice_detected = False  # Последнее состояние детекции речи
 
@@ -83,10 +83,23 @@ class VADBase(ABC):
         self.frame_duration = 20  # мс
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
         
+        # Рассчитываем количество фреймов для затухания
+        self.fade_frames = self._calculate_fade_frames()
+        
         # История детекции речи
         self.speech_history = []
         self.history_size = 3
         self.sensitivity = 0.2
+
+    def _calculate_fade_frames(self) -> int:
+        """Рассчитывает количество фреймов для затухания на основе времени"""
+        frames = int(self.fade_time_ms / self.frame_duration)
+        return max(1, frames)  # Минимум 1 фрейм
+
+    def set_fade_time(self, fade_time_ms: int):
+        """Установка времени затухания в миллисекундах"""
+        self.fade_time_ms = max(0, fade_time_ms)
+        self.fade_frames = self._calculate_fade_frames()
 
     def connect_input(self, input_queue):
         """Подключение входной очереди."""
@@ -221,7 +234,9 @@ class VADBase(ABC):
     def get_config(self):
         """Получение конфигурации VAD для логирования"""
         return {
+            'fade_time_ms': self.fade_time_ms,
             'fade_frames': self.fade_frames,
+            'frame_duration': self.frame_duration,
             'is_fading': self.is_fading,
             'fade_counter': self.current_fade_counter
         }
@@ -231,7 +246,7 @@ class VADBase(ABC):
         # При обнаружении речи сразу сбрасываем затухание
         if voice_detected:
             self.is_fading = False
-            self.current_fade_counter = self.fade_frames
+            self.current_fade_counter = self.fade_frames  # Используем рассчитанное количество фреймов
             self.last_voice_detected = True
             return True
 
@@ -350,6 +365,11 @@ class WebRTCVAD(VADBase):
         super().__init__()
         self.vad = webrtcvad.Vad(aggressiveness)
         self.aggressiveness = aggressiveness
+        # WebRTC VAD использует фреймы по 10, 20 или 30 мс
+        self.frame_duration = 20  # мс
+        self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
+        # Пересчитываем количество фреймов для затухания
+        self.fade_frames = self._calculate_fade_frames()
 
     def process_frame(self, frame):
         """Обработка отдельного фрейма для WebRTC VAD"""
