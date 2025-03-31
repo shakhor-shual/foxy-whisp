@@ -10,6 +10,7 @@ class MessageSource(Enum):
     GUI = "gui"
     TEST = "test"
     SYSTEM = "system"
+    TCP = "tcp"  # Добавляем TCP как валидный источник
 
     @classmethod
     def normalize(cls, source: str) -> str:
@@ -19,6 +20,7 @@ class MessageSource(Enum):
             "asrstage": cls.ASR.value,
             "system": cls.SERVER.value,
             "pipeline": cls.SERVER.value,
+            "tcp": cls.SRC.value,  # TCP сообщения нормализуем как сообщения от SRC
         }
         return source_map.get(source.lower(), source.lower())
 

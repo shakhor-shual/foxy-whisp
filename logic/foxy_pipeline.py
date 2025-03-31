@@ -158,25 +158,39 @@ class SRCstage(PipelineElement):
         msg.send(self.out_queue)
 
     def configure(self):
+        """Initialize audio source based on configuration"""
         listen_type = self.args.get("listen", "tcp")
         self.send_log(f"Configuring {listen_type} source")
         
-        if listen_type == "tcp":
-            self.source = TCPSource(args=self.args, 
-                                  stop_event=self.stop_event,
-                                  container=self)  # Pass self as container
-        elif listen_type == "audio_device":
-            self.source = AudioDeviceSource(
-                samplerate=self.args.get("sample_rate", 16000),
-                blocksize=self.args.get("chunk_size", 320),
-                device=self.args.get("audio_device"),
-                stop_event=self.stop_event,
-                container=self  # Pass self as container
-            )
-        else:
-            raise ValueError(f"Unknown source type: {listen_type}")
-        
-        self.send_status('configured')
+        try:
+            if listen_type == "tcp":
+                self.source = TCPSource(
+                    args=self.args, 
+                    stop_event=self.stop_event,
+                    container=self
+                )
+                # Запускаем TCP source в отдельном потоке
+                import threading
+                self.tcp_thread = threading.Thread(target=self.source.run)
+                self.tcp_thread.daemon = True
+                self.tcp_thread.start()
+            elif listen_type == "audio_device":
+                self.source = AudioDeviceSource(
+                    samplerate=self.args.get("sample_rate", 16000),
+                    blocksize=self.args.get("chunk_size", 320),
+                    device=self.args.get("audio_device"),
+                    stop_event=self.stop_event,
+                    container=self  # Pass self as container
+                )
+                # Запускаем AudioDeviceSource
+                self.source.run()  # Добавляем явный запуск
+            else:
+                raise ValueError(f"Unknown source type: {listen_type}")
+            
+            self.send_status('configured')
+        except Exception as e:
+            self.send_log(f"Failed to configure source: {e}", level="error")
+            raise
 
     def send_level_message(self, level: int, is_silence: bool = False):
         """Отправка сообщения об уровне сигнала"""
@@ -191,7 +205,7 @@ class SRCstage(PipelineElement):
                 }
             }
             if self.out_queue:
-                self.out_queue.put(message)
+                self.send_data('audio_level', message['payload'])
             self.last_level_msg_time = current_time
 
     def process(self, audio_chunk):
@@ -200,7 +214,6 @@ class SRCstage(PipelineElement):
             # Сначала нормализуем входные данные до диапазона [-1, 1]
             if audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
-            if np.max(np.abs(audio_chunk)) > 1.0:
                 audio_chunk = audio_chunk / 32768.0  # нормализация из int16
 
             # Измеряем уровень входного сигнала
@@ -243,9 +256,8 @@ class SRCstage(PipelineElement):
 
                 # Проверка на голос
                 if self.vad.detect_voice(chunk):
-                    voice_chunks_detected += 1
+                    voice_chunks_detected += 1                    
                     self.audio_write(chunk)
-                    
                     # Статистика только для голосовых чанков
                     self.send_data('audio_chunk', {
                         'size': len(chunk),
@@ -284,9 +296,8 @@ class SRCstage(PipelineElement):
         return audio_chunk.astype(np.float32)
 
     def _handle_command(self, command: Dict[str, Any]):
-        """Handle incoming commands"""
+        """Handle incoming commands"""        
         cmd = command.get('command')
-        
         if cmd == 'get_audio_devices':
             # Get devices list from AudioDeviceSource
             devices_info = AudioDeviceSource.get_audio_devices()
@@ -303,21 +314,23 @@ class SRCstage(PipelineElement):
         try:
             self.configure()
             self.send_log("SRC stage configured and running", level="info")
+            
+            # Добавляем проверку на запуск источника
+            if hasattr(self.source, 'stream') and self.source.stream is None:
+                self.source.run()
+            
             while not self.stop_event.is_set():
                 self.process_control_commands()
-                
                 if self.pause_event.is_set():
                     self.send_log("Processing paused", level="debug")
                     time.sleep(0.1)
                     continue
-
                 if audio_data := self.source.receive_audio():
                     self.send_log("Received audio data", level="debug", 
-                                details={"data_size": len(audio_data)})
+                                  details={"data_size": len(audio_data)})
                     self.process(audio_data)
                 else:
                     time.sleep(0.01)
-                    
         except Exception as e:
             self.send_log(f"SRC error: {str(e)}", level="error", 
                          details={"exception_type": type(e).__name__})
@@ -344,7 +357,6 @@ class ASRstage(PipelineElement):
 
     def process(self, audio_chunk):
         self.chunk_counter += 1
-        
         # Уменьшаем интервал с 50 до 10 чанков
         if self.chunk_counter % 10 == 0:  # Каждые 10 чанков
             phrase = self.test_phrases[self.chunk_counter % len(self.test_phrases)]
@@ -363,16 +375,13 @@ class ASRstage(PipelineElement):
             self.configure()
             while not self.stop_event.is_set():
                 self.process_control_commands()
-                
                 if self.pause_event.is_set():
                     time.sleep(0.1)
                     continue
-
                 if data := self.audio_read():
                     self.process(data)
                 else:
                     time.sleep(0.01)
-                    
         except Exception as e:
             self.send_log(f"ASR error: {str(e)}", level="error")
             self.send_status('error', error=str(e))

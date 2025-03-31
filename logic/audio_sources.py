@@ -1,21 +1,16 @@
 from logic.foxy_config import *
 from logic.audio_utils import calculate_vu_meter
 from logic.foxy_message import PipelineMessage, MessageType
-from typing import Any, Optional  # Add this import
-import logging
+from typing import Any, Optional
 import numpy as np
 import sounddevice as sd
 import socket
 import time
 import select
-from logic.foxy_utils import logger, get_port_status
 from collections import deque
 from multiprocessing import Event
 from scipy.signal import resample
 
-logger = logging.getLogger(__name__)
-
-###################################################################
 class AudioDeviceSource:
     def __init__(self, samplerate=None, blocksize=32768, device=None, 
                  accumulation_buffer_size=1, stop_event=None, container=None):
@@ -28,6 +23,7 @@ class AudioDeviceSource:
         self.stop_event = stop_event or Event()  # Default value if None
         self.container = container  # Reference to src-stage container
         self.last_level_time = time.time()  # Initialize with current time
+        self.debug_enabled = True  # Добавляем флаг отладки
 
     @staticmethod
     def list_devices():
@@ -44,7 +40,7 @@ class AudioDeviceSource:
                         'default_samplerate': device['default_samplerate']
                     })
         except Exception as e:
-            logger.error(f"Error listing audio devices: {e}")
+            print(f"Error listing audio devices: {e}")
         return devices
 
     @classmethod
@@ -56,29 +52,58 @@ class AudioDeviceSource:
             "devices": devices
         }
 
-    def log(self, level, message, **details):
-        """Enhanced logging with details support"""
-        if self.container:
-            try:
-                self.container.send_log(message, level=level.lower(), **details)
-            except Exception as e:
-                print(f"AudioSource logging error: {e}, Message: {message}")
+    def _send_message(self, msg_type: MessageType, content: dict):
+        """Унифицированный метод отправки сообщений"""
+        if not self.container or not hasattr(self.container, 'out_queue'):
+            if self.debug_enabled:
+                print(f"AudioDeviceSource: Can't send message - no container queue: {content}")
+            return False
 
-    def send_status(self, status: str, **details):
-        """Send status updates through container"""
-        if self.container:
-            try:
-                self.container.send_status(status, **details)
-            except Exception as e:
-                print(f"AudioSource status error: {e}, Status: {status}")
+        try:
+            msg = PipelineMessage(
+                source='src',  # Важно: используем 'src' как источник
+                type=msg_type,
+                content=content
+            )
+            msg.send(self.container.out_queue)
+            
+            if self.debug_enabled:
+                print(f"AudioDeviceSource: Message sent: {msg_type}, Content: {content}")
+            return True
+        except Exception as e:
+            if self.debug_enabled:
+                print(f"AudioDeviceSource: Failed to send message: {e}")
+            return False
+
+    def log(self, level: str, message: str, **details):
+        """Улучшенное логирование"""
+        content = {
+            'message': message,
+            'level': level.lower(),
+        }
+        if details:
+            content['details'] = details
+
+        if self._send_message(MessageType.LOG, content):
+            if self.debug_enabled:
+                print(f"AudioDeviceSource Log: [{level}] {message} {details if details else ''}")
 
     def send_data(self, data_type: str, data: Any, **metadata):
-        """Send data through container"""
-        if self.container:
-            try:
-                self.container.send_data(data_type, data, **metadata)
-            except Exception as e:
-                print(f"AudioSource data error: {e}, Type: {data_type}")
+        """Send data through PipelineMessage"""
+        content = {
+            'data_type': data_type,
+            'payload': data,
+            **metadata
+        }
+        return self._send_message(MessageType.DATA, content)
+
+    def send_status(self, status: str, **details):
+        """Send status through PipelineMessage"""
+        content = {
+            'status': status,
+            'details': details
+        }
+        return self._send_message(MessageType.STATUS, content)
 
     def run(self):
         # Проверяем состояние stop_event перед запуском
@@ -103,10 +128,15 @@ class AudioDeviceSource:
                 callback=self.callback
             )
             self.stream.start()
+            
+            # Отправляем статусы о запуске
+            self.send_status('starting')
             self.log("info", "Audio stream started",
                     samplerate=self.samplerate,
                     blocksize=self.blocksize,
                     device=self.device)
+            self.send_status('configured')
+            
         except Exception as e:
             self.log("error", "Failed to start audio stream",
                     error=str(e),
@@ -119,7 +149,9 @@ class AudioDeviceSource:
             self.stream.stop()
             self.stream.close()
             self.stream = None
-        self.log("INFO", "AudioDeviceSource stopped")
+            # Отправляем статус остановки
+            self.send_status('stopped')
+            self.log("info", "Audio device stopped")
 
     def callback(self, indata, frames, time_info, status):
         """Callback-функция для обработки аудиоданных."""
@@ -137,7 +169,11 @@ class AudioDeviceSource:
             current_time = time.time()
             if current_time - self.last_level_time >= 0.1:
                 level = calculate_vu_meter(float_data)
-                self.send_data('audio_level', {'level': level, 'timestamp': current_time})
+                self.send_data('audio_level', {
+                    'level': level,
+                    'timestamp': current_time,
+                    'is_silence': level == 0
+                })
                 self.last_level_time = current_time
 
             # Process data for the pipeline
@@ -190,59 +226,107 @@ class TCPSource:
         self.sample_width = 2
         self.internal_queue = deque()
         self.container = container  # Reference to src-stage container
+        self.name = "tcp"  # Добавляем имя для логов
+        self.debug_enabled = True  # Включаем отладку
 
-    def log(self, level, message, **details):
-        """Enhanced logging with details support"""
-        if self.container:
-            if details:
-                self.container.send_log(message, level=level, **details)
-            else:
-                self.container.send_log(message, level=level)
+    def _send_message(self, msg_type: MessageType, content: dict):
+        """Унифицированный метод отправки сообщений"""
+        if not self.container or not hasattr(self.container, 'out_queue'):
+            if self.debug_enabled:
+                print(f"TCPSource: Can't send message - no container queue: {content}")
+            return False
 
-    def send_status(self, status: str, **details):
-        """Send status updates through container"""
-        if self.container:
-            self.container.send_status(status, **details)
+        try:
+            msg = PipelineMessage(
+                source='src',  # Всегда используем 'src' как источник
+                type=msg_type,
+                content=content
+            )
+            msg.send(self.container.out_queue)
+            
+            if self.debug_enabled:
+                print(f"TCPSource: Message sent: {msg_type}, Content: {content}")
+            return True
+        except Exception as e:
+            if self.debug_enabled:
+                print(f"TCPSource: Failed to send message: {e}")
+            return False
+
+    def log(self, level: str, message: str, **details):
+        """Улучшенное логирование"""
+        content = {
+            'message': message,
+            'level': level.lower(),
+        }
+        if details:
+            content['details'] = details
+
+        if self._send_message(MessageType.LOG, content):
+            if self.debug_enabled:
+                print(f"TCPSource Log: [{level}] {message} {details if details else ''}")
 
     def run(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind((self.host, self.port))
-        self.socket.listen(1)
-        self.socket.settimeout(1)
-        self.log("info", f"TCP server listening", host=self.host, port=self.port)
+        try:
+            # Создаём сокет и настраиваем его
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.bind((self.host, self.port))
+            self.socket.listen(1)
+            self.socket.settimeout(1)
 
-        while not self.stop_event.is_set():
-            try:
-                self.connection, addr = self.socket.accept()
-                self.log("INFO", f"Connected to client on {addr}")
+            # Отправляем информацию о запуске
+            self._send_message(
+                MessageType.LOG,
+                {'message': 'TCP server initialized', 'level': 'info'}
+            )
 
-                while not self.stop_event.is_set():
-                    try:
-                        data = self.connection.recv(self.chunk_size * self.sample_width)
-                        if not data:
+            self._send_message(
+                MessageType.LOG,
+                {
+                    'message': f'TCP server listening on {self.host}:{self.port}',
+                    'level': 'info',
+                    'details': {'host': self.host, 'port': self.port}
+                }
+            )
+
+            while not self.stop_event.is_set():
+                try:
+                    self.connection, addr = self.socket.accept()
+                    self.log("info", f"Connected to client", address=addr)
+
+                    while not self.stop_event.is_set():
+                        try:
+                            data = self.connection.recv(self.chunk_size * self.sample_width)
+                            if not data:
+                                break
+
+                            self.internal_queue.append(np.frombuffer(data, dtype=np.int16))
+                        except socket.timeout:
+                            continue
+                        except BrokenPipeError:
+                            self.log("error", "Client disconnected unexpectedly.")
+                            break
+                        except Exception as e:
+                            self.log("error", f"Error receiving audio data: {e}")
                             break
 
-                        self.internal_queue.append(np.frombuffer(data, dtype=np.int16))
-                    except socket.timeout:
-                        continue
-                    except BrokenPipeError:
-                        self.log("ERROR", "Client disconnected unexpectedly.")
-                        break
-                    except Exception as e:
-                        self.log("ERROR", f"Error receiving audio data: {e}")
-                        break
+                    self.connection.close()
+                    self.log("info", "Connection to client closed")
 
-                self.connection.close()
-                self.log("INFO", "Connection to client closed")
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    self.log("error", f"Error in server loop: {e}")
+                    break
 
-            except socket.timeout:
-                continue
-            except Exception as e:
-                self.log("ERROR", f"Error in server loop: {e}")
-                break
+        except Exception as e:
+            self.log("error", f"Failed to start TCP server: {str(e)}")
+            raise
+        finally:
+            if self.socket:
+                self.socket.close()
+                self.log("info", "TCP server socket closed")
 
-        self.log("INFO", "TCP server stopped")
-
+        self.log("info", "TCP server stopped")
 
     def _non_blocking_receive_audio(self):
         """ Receive audio data in a non-blocking manner. """
@@ -271,7 +355,8 @@ class TCPSource:
             self.connection.close()
         if self.socket:
             self.socket.close()
-        self.log("INFO", "TCP server resources released")
+        # Изменяем уровень лога на info
+        self.log("info", "TCP server stopped and resources released")
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""

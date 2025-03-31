@@ -10,18 +10,103 @@ import psutil
 from functools import lru_cache
 import subprocess
 import importlib
+import sounddevice as sd
 #from wtpsplit import WtP
 
 logger = logging.getLogger(__name__)
 @lru_cache(10**6)
 
 ##########################
+def get_default_audio_device():
+    """Get default input device and its parameters"""
+    try:
+        devices = sd.query_devices()
+        default_device = sd.query_devices(kind='input')
+        device_id = None
+        
+        # Находим ID дефолтного устройства
+        for i, dev in enumerate(devices):
+            if dev.get('name') == default_device.get('name') and dev.get('max_input_channels') > 0:
+                device_id = i
+                break
+        
+        if device_id is None:
+            logger.warning("No default input device found, using device 0")
+            device_id = 0
+            default_device = sd.query_devices(device_id, 'input')
+            
+        return {
+            'device_id': device_id,
+            'name': default_device.get('name'),
+            'default_samplerate': int(default_device.get('default_samplerate')),
+            'max_input_channels': default_device.get('max_input_channels'),
+        }
+    except Exception as e:
+        logger.error(f"Error getting default audio device: {e}")
+        return {'device_id': 0, 'default_samplerate': 44100, 'max_input_channels': 1}
+
+##########################
+def get_supported_sample_rates(device_info):
+    """Returns list of supported sample rates for the audio device"""
+    try:
+        device_id = device_info['device_id']
+        default_sr = device_info['default_samplerate']
+        supported_srs = []
+        
+        # Проверяем стандартные частоты и дефолтную частоту устройства
+        test_rates = sorted(list(set([8000, 16000, 22050, 44100, 48000, default_sr])))
+        
+        for sr in test_rates:
+            try:
+                sd.check_input_settings(device=device_id, samplerate=sr, channels=1)
+                supported_srs.append(sr)
+                logger.debug(f"Sample rate {sr} Hz is supported")
+            except sd.PortAudioError:
+                continue
+                
+        if not supported_srs:
+            logger.warning(f"Using default sample rate: {default_sr}")
+            return [default_sr]
+            
+        return supported_srs
+    except Exception as e:
+        logger.error(f"Error checking sample rates: {e}")
+        return [device_info['default_samplerate']]
+
+##########################
+def initialize_audio_device(args):
+    """Initialize audio device with optimal parameters"""
+    try:
+        # Получаем информацию о дефолтном устройстве
+        device_info = get_default_audio_device()
+        
+        # Если указано конкретное устройство в аргументах
+        if args.audio_device is not None:
+            device_info['device_id'] = args.audio_device
+        
+        # Получаем поддерживаемые частоты
+        supported_rates = get_supported_sample_rates(device_info)
+        
+        # Выбираем оптимальную частоту (ближайшую к 16000)
+        target_sr = min(supported_rates, key=lambda x: abs(x - 16000))
+        
+        logger.info(f"Using audio device: {device_info['name']} (id: {device_info['device_id']})")
+        logger.info(f"Sample rate: {target_sr} Hz")
+        
+        return device_info['device_id'], target_sr
+        
+    except Exception as e:
+        logger.error(f"Error initializing audio device: {e}")
+        raise
+
+##########################
 def add_shared_args(parser):
     """Adds shared arguments for ASR configuration."""
-
-
-    parser.add_argument("--listen", type=str, default="tcp", choices=["tcp", "audio_device"], help="Source of audio input: 'tcp' (default) or 'audio_device'.")
-    parser.add_argument("--audio-device", type=int, default=None, help="ID of the audio input device (if --listen=audio_device).")
+    parser.add_argument("--listen", type=str, default="audio_device", 
+                       choices=["tcp", "audio_device"], 
+                       help="Source of audio input: 'audio_device' (default) or 'tcp'.")
+    parser.add_argument("--audio-device", type=int, default=None,
+                       help="ID of the audio input device (if not specified, default device will be used).")
 
     parser.add_argument('--lan', '--language', type=str, default='auto', choices= WHISPER_LANG_CODES, help="Language of the input audio (e.g., 'ru', 'en' or 'auto' for autodetect).")
     parser.add_argument('--task', type=str, default='transcribe', choices=["transcribe", "translate"], help="Task: transcription or translation.")
@@ -49,7 +134,15 @@ def add_shared_args(parser):
 
 ##########################
 def load_audio(fname):
-    a, _ = librosa.load(fname, sr=16000, dtype=np.float32)
+    """Modified to use the closest supported sample rate"""
+    device_info = get_default_audio_device()
+    supported_rates = get_supported_sample_rates(device_info)
+    target_sr = min(supported_rates, key=lambda x: abs(x - 16000))
+    logger.info(f"Using sample rate: {target_sr} Hz")
+    a, _ = librosa.load(fname, sr=target_sr, dtype=np.float32)
+    if target_sr != 16000:
+        # Resample to required 16000 Hz
+        a = librosa.resample(a, orig_sr=target_sr, target_sr=16000)
     return a
 
 ##########################
