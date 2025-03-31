@@ -150,10 +150,11 @@ class FoxyWhispGUI:
             self.send_command("update_params", vars(self.args))
 
     def create_audio_level_indicator(self):
-        """Create audio level meter"""
+        """Create audio level meter and VAD indicator"""
         self.level_frame = ttk.Frame(self.main_frame)
         self.level_frame.pack(fill=tk.X, pady=5)
 
+        # Audio Level indicator
         self.level_label = ttk.Label(self.level_frame, text="Audio Level:")
         self.level_label.pack(side=tk.LEFT)
 
@@ -164,6 +165,16 @@ class FoxyWhispGUI:
             mode="determinate"
         )
         self.level_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # VAD Status indicator
+        self.vad_label = ttk.Label(
+            self.level_frame, 
+            text="VAD",
+            background='gray',  # Default color
+            width=6,
+            anchor='center'
+        )
+        self.vad_label.pack(side=tk.RIGHT, padx=5)
 
     def update_audio_level(self, level_data):
         """Update audio level meter.
@@ -591,8 +602,18 @@ class FoxyWhispGUI:
                 break
 
     def handle_server_message(self, msg: PipelineMessage):
-        """Handle server messages with improved context display"""
+        """Handle server messages with improved VAD status handling"""
         try:
+            if msg.is_status() and msg.source == 'src.vad':
+                status = msg.content.get('status')
+                details = msg.content.get('details', {})
+                
+                if status == 'processing':
+                    voice_detected = details.get('voice_detected', False)
+                    # Optimize VAD updates by using after_idle
+                    self.root.after_idle(lambda: self._update_vad_status(voice_detected))
+                    return
+
             source_parts = msg.source.split('.')
             base_source = source_parts[0]
             component = source_parts[1] if len(source_parts) > 1 else 'main'
@@ -649,7 +670,14 @@ class FoxyWhispGUI:
             source = msg.source.lower()
             details = msg.content.get('details', {})
             
-            # Convert system source to server
+            # Add VAD status handling
+            if source == 'src.vad':
+                if 'voice_detected' in details:
+                    vad_active = details['voice_detected']
+                    self.message_queue.put(('update_vad', vad_active))
+                    return
+
+            # Existing status handling code
             if source == 'system':
                 source = 'server'
                 
@@ -738,13 +766,75 @@ class FoxyWhispGUI:
                         elif action == 'update_button':
                             button, kwargs = args
                             button.configure(**kwargs)
-                            self.root.update()  # Force immediate update
+                        elif action == 'update_vad':
+                            current_color = self.vad_label.cget('background')
+                            target_color = '#00ff00' if args else '#ff0000'
+                            self._animate_color_change(current_color, target_color)
+                        self.root.update()  # Force immediate update
                     self.message_queue.task_done()
                 except queue.Empty:
                     break
         finally:
             if self.root:
-                self.root.after(10, self.process_message_queue)  # Faster updates
+                self.root.after(5, self.process_message_queue)  # Increase update rate to 200Hz
+
+    def _animate_color_change(self, start_color, end_color, steps=10):
+        """Плавное изменение цвета индикатора"""
+        if start_color == end_color:
+            return
+            
+        def hex_to_rgb(color):
+            """Convert color to RGB values"""
+            try:
+                # Handle Tcl_Obj color names
+                if not isinstance(color, str) or not color.startswith('#'):
+                    # Get RGB from Tkinter
+                    rgb = self.vad_label.winfo_rgb(color)
+                    # Convert to hex format
+                    return tuple(c//256 for c in rgb)
+                # Handle hex colors
+                color = color.lstrip('#')
+                return tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+            except Exception as e:
+                print(f"Color conversion error: {e}")
+                return (0, 0, 0)
+
+        def rgb_to_hex(rgb):
+            """Convert RGB tuple to hex color"""
+            return '#{:02x}{:02x}{:02x}'.format(*rgb)
+
+        def interpolate_colors(start_rgb, end_rgb, step, total):
+            """Интерполяция между RGB цветами"""
+            return tuple(
+                int(start + (float(step) / total) * (end - start))
+                for start, end in zip(start_rgb, end_rgb)
+            )
+
+        # Convert colors to RGB
+        start_rgb = hex_to_rgb(start_color)
+        end_rgb = hex_to_rgb(end_color)
+
+        def animate(step=0):
+            if step <= steps:
+                try:
+                    # Interpolate and convert to hex
+                    color = rgb_to_hex(interpolate_colors(start_rgb, end_rgb, step, steps))
+                    self.vad_label.configure(background=color)
+                    self.root.after(20, lambda: animate(step + 1))
+                except Exception as e:
+                    logger.error(f"Animation error: {str(e)}", exc_info=True)
+            
+        animate()
+
+    def _update_vad_status(self, is_active: bool):
+        """Direct VAD status update"""
+        try:
+            current = self.vad_label.cget('background')
+            target = '#00ff00' if is_active else '#ff0000'
+            if str(current) != str(target):  # Convert both to string for comparison
+                self._animate_color_change(current, target)
+        except Exception as e:
+            logger.error(f"VAD update error: {str(e)}", exc_info=True)
 
     def run(self):
         """Run the GUI main loop"""

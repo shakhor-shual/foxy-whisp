@@ -69,6 +69,7 @@ class VADBase(ABC):
         self.current_state = None  # Текущее состояние VAD (речь/тишина)
         self.audio_buffer = AudioBuffer()  # Добавляем буфер аудиоданных
         self.last_status_time = 0
+        self.min_status_interval = 0.03  # Увеличиваем частоту до ~33 Hz
         self.vad_id = f"vad_{id(self)}"  # Уникальный идентификатор VAD
         self.vad_type = self.__class__.__name__
 
@@ -99,9 +100,9 @@ class VADBase(ABC):
         pass
 
     def send_status(self, status: str, **details):
-        """Enhanced status sending with rate limiting and source identification"""
+        """Enhanced status sending with higher update rate"""
         current_time = time.time()
-        if current_time - self.last_status_time >= 0.1:  # Max 10 updates per second
+        if current_time - self.last_status_time >= self.min_status_interval:
             if self.control_queue:
                 # Добавляем vad_info в детали
                 vad_info = {
@@ -226,6 +227,7 @@ class WebRTCVAD(VADBase):
 
     def detect_voice(self, audio_chunk):
         """Анализ аудиоданных с использованием WebRTC VAD."""
+        start_time = time.time()
         try:
             # Проверка и преобразование входных данных
             if not isinstance(audio_chunk, np.ndarray):
@@ -235,7 +237,7 @@ class WebRTCVAD(VADBase):
             # Нормализация до float32 [-1, 1]
             if audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
-            max_abs = np.max(np.abs(audio_chunk))  # Вычисляем максимум один раз
+            max_abs = np.max(np.abs(audio_chunk))
             if max_abs > 1.0:  
                 audio_chunk = audio_chunk / 32768.0
 
@@ -248,9 +250,6 @@ class WebRTCVAD(VADBase):
             # Разделение на фреймы фиксированного размера
             num_frames = len(audio_int16) // self.frame_size
             frame_length = num_frames * self.frame_size
-            if frame_length == 0:
-                return False
-            
             frames = np.array_split(audio_int16[:frame_length], num_frames)
 
             # Подсчет фреймов с речью
@@ -260,31 +259,32 @@ class WebRTCVAD(VADBase):
                 self.vad.is_speech(frame.tobytes(), self.sample_rate)
             )
 
-            # Отправка статистики
+            # Вычисляем соотношение речи
+            speech_ratio = speech_frames / num_frames if num_frames > 0 else 0
+            is_speech = speech_ratio >= 0.3
+
+            # Принудительно отправляем статус для каждого чанка
+            processing_time = time.time() - start_time
             self.send_status(
                 "processing",
                 frames_total=num_frames,
                 frames_with_speech=speech_frames,
-                frame_size=self.frame_size
+                frame_size=self.frame_size,
+                voice_detected=is_speech,
+                performance={'processing_time_ms': processing_time * 1000}
             )
 
-            # Определяем наличие речи по проценту фреймов с речью
-            if num_frames == 0:
-                return False
-                
-            speech_ratio = speech_frames / num_frames
-            return speech_ratio >= 0.3  # Если более 30% фреймов содержат речь
+            return is_speech
 
         except Exception as e:
+            import traceback
             self.send_exception(
                 e,
                 "VAD processing error",
-                level="error",
-                error_location=f"WebRTCVAD[{self.vad_id}].detect_voice",
+                traceback=traceback.format_exc(),
                 frame_info={
                     'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
-                    'expected_size': self.frame_size,
-                    'audio_dtype': str(audio_chunk.dtype) if audio_chunk is not None else None
+                    'frame_size': self.frame_size
                 }
             )
             return False
