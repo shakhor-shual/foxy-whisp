@@ -11,6 +11,7 @@ from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
 from logic.log_filter import LogFilter
 import queue
+import time
 
 class FoxyWhispGUI:
     def __init__(self, gui_to_server: MPQueue, server_to_gui: MPQueue, args, parser):
@@ -503,10 +504,19 @@ class FoxyWhispGUI:
         self.advanced_options_visible = not self.advanced_options_visible
 
     def on_close(self):
-        """Handle window close event"""
-        if self.server_running:
-            self.send_command("stop")
-        self.root.destroy()
+        """Enhanced window close handler"""
+        try:
+            if self.server_running:
+                # Сначала останавливаем запись
+                self.send_command("stop_recording")
+                # Даем время на финализацию файла
+                time.sleep(0.5)
+                # Затем останавливаем сервер
+                self.send_command("stop")
+                # Ждем завершения
+                time.sleep(0.5)
+        finally:
+            self.root.destroy()
 
     def append_text(self, text: str):
         """Append text with improved message parsing"""

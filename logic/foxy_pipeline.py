@@ -637,6 +637,7 @@ class ASRstage(PipelineElement):
         self.debug_sample_rate = 16000
         self.stop_recording_requested = False  # Флаг запроса на остановку записи
         self.recording_stopped = True  # Флаг состояния записи
+        self._finalizing = False
         self.send_log("ASR stage initialized")
 
     def init_debug_recording(self):
@@ -681,22 +682,35 @@ class ASRstage(PipelineElement):
             self.debug_recording = False
 
     def stop_debug_recording(self):
-        """Enhanced stop debug recording"""
+        """Enhanced stop debug recording with safe finalization"""
+        self._finalizing = True
         try:
             if self.debug_file:
-                self.debug_file.flush()  # Принудительная запись буфера
+                # Принудительно сбрасываем буферы на диск
+                self.debug_file.flush()
+                # Закрываем файл
                 self.debug_file.close()
                 self.debug_file = None
+                
+                # Проверяем что файл действительно записан
+                if os.path.exists(self.debug_file_path):
+                    file_size = os.path.getsize(self.debug_file_path)
+                    self.send_log(
+                        "Debug recording finalized", 
+                        level="info",
+                        details={'file': self.debug_file_path, 'size': file_size}
+                    )
             self.debug_recording = False
             self.recording_stopped = True
-            self.send_log("Debug recording stopped and file closed", level="info")
             
         except Exception as e:
             self.send_exception(
                 e,
-                "Error stopping debug recording",
+                "Error finalizing debug recording",
                 component="debug_recorder"
             )
+        finally:
+            self._finalizing = False
 
     def write_debug_audio(self, audio_chunk):
         """Write audio chunk to debug file"""
@@ -714,25 +728,30 @@ class ASRstage(PipelineElement):
             self.stop_debug_recording()
 
     def process(self, audio_chunk):
-        """Enhanced process method with controlled recording stop"""
+        """Enhanced process with safe finalization"""
         try:
-            # Проверяем запрос на остановку записи
             if self.stop_recording_requested:
-                if self.pipe_input and self.pipe_input.empty():
-                    # Буфер пуст, можно остановить запись
-                    self.stop_debug_recording()
-                    self.stop_recording_requested = False
-                    self.recording_stopped = True
-                    self.send_log("Debug recording completed and file closed", level="info")
-                    return None
+                # Даем время на обработку оставшихся данных
+                if self.pipe_input:
+                    while not self.pipe_input.empty():
+                        try:
+                            data = self.pipe_input.get(timeout=0.1)
+                            if data is not None and len(data) > 0:
+                                self.write_debug_audio(data)
+                        except:
+                            break
+                    
+                self.stop_debug_recording()
+                self.stop_recording_requested = False
+                return None
 
             # Записываем входящий аудиопоток если включена отладка
             if self.debug_recording and not self.recording_stopped:
                 if audio_chunk is not None and len(audio_chunk) > 0:
                     self.write_debug_audio(audio_chunk)
 
+            # Обработка чанков и генерация тестовых фраз
             self.chunk_counter += 1
-            # Уменьшаем интервал с 50 до 10 чанков
             if self.chunk_counter % 10 == 0:  # Каждые 10 чанков
                 phrase = self.test_phrases[self.chunk_counter % len(self.test_phrases)]
                 self.text_buffer += phrase + " "
@@ -781,9 +800,9 @@ class ASRstage(PipelineElement):
                 while not self.pipe_input.empty():
                     if data := self.audio_read():
                         self.process(data)
-            
-            # Close recording if still active
-            self.stop_debug_recording()
+            else:
+                # Close recording if still active
+                self.stop_debug_recording()
             
         except Exception as e:
             self.send_exception(
@@ -809,8 +828,15 @@ class ASRstage(PipelineElement):
             super()._handle_command(command)
 
     def _run(self):
-        self.send_status('starting')
+        """Updated run method with safe cleanup"""
+        import atexit
+        # Регистрируем функцию очистки
+        def cleanup():
+            if self.debug_file and not self._finalizing:
+                self.stop_debug_recording()
+        atexit.register(cleanup)
         try:
+            self.send_status('starting')
             self.configure()
             while not self.stop_event.is_set():
                 self.process_control_commands()
@@ -833,6 +859,8 @@ class ASRstage(PipelineElement):
             )
             self.send_status('error', error=str(e))
         finally:
+            cleanup()
+            atexit.unregister(cleanup)
             if hasattr(self, 'text_buffer') and self.text_buffer:
                 self.send_data('asr_final_result', {
                     'text': self.text_buffer,
