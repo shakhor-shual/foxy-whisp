@@ -146,6 +146,61 @@ class PipelineElement(ABC):
             error_details=error_context
         )
 
+    def terminate(self):
+        """Terminate the process with logging"""
+        try:
+            if self._process and self._process.is_alive():
+                self._process.terminate()
+                self.send_log(
+                    "Process terminated",
+                    level="warning",
+                    details={
+                        'pid': self._process.pid,
+                        'name': self.__class__.__name__
+                    }
+                )
+        except Exception as e:
+            import traceback
+            self.send_log(
+                f"Error terminating process: {str(e)}", 
+                level="error",
+                details={
+                    'traceback': traceback.format_exc(),
+                    'pid': self._process.pid if self._process else None,
+                    'name': self.__class__.__name__
+                }
+            )
+
+    def stop(self):
+        """Enhanced stop method with graceful shutdown"""
+        try:
+            if self._process and self._process.is_alive():
+                # First try graceful shutdown
+                self.stop_event.set()
+                self._process.join(timeout=2.0)
+                
+                # If still alive, force terminate
+                if self._process.is_alive():
+                    self.terminate()
+                    self._process.join(timeout=1.0)
+                    
+                # Clear process reference
+                if hasattr(self._process, 'close'):
+                    self._process.close()
+                self._process = None
+                
+        except Exception as e:
+            import traceback
+            self.send_log(
+                f"Error stopping process: {str(e)}", 
+                level="error",
+                details={
+                    'traceback': traceback.format_exc(),
+                    'pid': self._process.pid if self._process else None,
+                    'name': self.__class__.__name__
+                }
+            )
+
     def _run(self):
         """Updated run method with enhanced error handling"""
         self.send_status('starting')
@@ -196,13 +251,6 @@ class PipelineElement(ABC):
             self._process = Process(target=self._run)
             self._process.start()
             self.send_log(f"Process started (PID: {self._process.pid})")
-
-    def stop(self):
-        if self._process and self._process.is_alive():
-            self.stop_event.set()
-            self._process.join(timeout=2.0)
-            if self._process.is_alive():
-                self._process.terminate()
 
     def join(self, timeout=None):
         if self._process:
@@ -505,19 +553,23 @@ class ASRstage(PipelineElement):
                 if self.pause_event.is_set():
                     time.sleep(0.1)
                     continue
-                if data := self.audio_read():
-                    self.process(data)
+                    
+                # Fix: Правильная проверка numpy array
+                audio_data = self.audio_read()
+                if audio_data is not None and audio_data.size > 0:
+                    self.process(audio_data)
                 else:
                     time.sleep(0.01)
         except Exception as e:
             self.send_exception(
                 e,
                 "ASR stage error",
-                level="error"
+                level="error",
+                component="main"
             )
             self.send_status('error', error=str(e))
         finally:
-            if self.text_buffer:
+            if hasattr(self, 'text_buffer') and self.text_buffer:
                 self.send_data('asr_final_result', {
                     'text': self.text_buffer,
                     'is_final': True
