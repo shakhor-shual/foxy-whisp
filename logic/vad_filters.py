@@ -73,7 +73,7 @@ class VADBase(ABC):
         self.vad_id = f"vad_{id(self)}"  # Уникальный идентификатор VAD
         self.vad_type = self.__class__.__name__
         # Параметры затухания в миллисекундах
-        self.fade_time_ms = 500  # Время затухания в миллисекундах (default 500ms)
+        self.fade_time_ms = round(500 / 100) * 100  # Время затухания округлено до ближайших 100мс
         self.current_fade_counter = 0  # Текущий счетчик затухания в фреймах
         self.is_fading = False  # Флаг состояния затухания
         self.last_voice_detected = False  # Последнее состояние детекции речи
@@ -106,7 +106,8 @@ class VADBase(ABC):
         if fade_time_ms < 0:
             return
             
-        self.fade_time_ms = fade_time_ms
+        # Round to nearest 100ms
+        self.fade_time_ms = round(fade_time_ms / 100) * 100
         self.fade_frames = self._calculate_fade_frames()
         
         # Send status update

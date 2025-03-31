@@ -189,7 +189,9 @@ class FoxyWhispGUI:
 
         ttk.Label(self.fade_frame, text="VAD Fade:").pack(side=tk.LEFT)
         
-        self.fade_value = tk.StringVar(value=str(self.args.vad_fade_time))
+        # Round initial value to nearest 100ms
+        initial_fade_time = round(self.args.vad_fade_time / 100) * 100
+        self.fade_value = tk.StringVar(value=str(initial_fade_time))
         ttk.Label(self.fade_frame, textvariable=self.fade_value, width=4).pack(side=tk.RIGHT)
         
         self.fade_slider = ttk.Scale(
@@ -200,19 +202,36 @@ class FoxyWhispGUI:
             command=self.on_fade_change
         )
         self.fade_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        # Set initial value from args
-        self.fade_slider.set(self.args.vad_fade_time)
+        # Set initial value
+        self.fade_slider.set(initial_fade_time)
+        
+        # Add delay to prevent too frequent updates
+        self._fade_update_after = None
 
     def on_fade_change(self, value):
-        """Handle fade slider changes"""
+        """Handle fade slider changes with debouncing"""
         try:
-            fade_time = int(float(value))
-            # Update display
-            self.fade_value.set(str(fade_time))
-            # Send command to server
-            self.send_command("update_vad_fade_time", {"fade_time_ms": fade_time})
+            # Cancel previous update if exists
+            if self._fade_update_after:
+                self.root.after_cancel(self._fade_update_after)
+            
+            # Round to nearest 100ms
+            fade_time = round(float(value) / 100) * 100
+            # Update display immediately
+            self.fade_value.set(str(int(fade_time)))
+            
+            # Schedule actual update with delay
+            self._fade_update_after = self.root.after(
+                200,  # 200ms delay for debouncing
+                lambda: self._send_fade_update(fade_time)
+            )
         except ValueError:
             pass
+
+    def _send_fade_update(self, fade_time: int):
+        """Actually send the fade time update command"""
+        self._fade_update_after = None
+        self.send_command("update_vad_fade_time", {"fade_time_ms": fade_time})
 
     def update_audio_level(self, level_data):
         """Update audio level meter.
