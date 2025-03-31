@@ -72,6 +72,21 @@ class VADBase(ABC):
         self.min_status_interval = 0.03  # Увеличиваем частоту до ~33 Hz
         self.vad_id = f"vad_{id(self)}"  # Уникальный идентификатор VAD
         self.vad_type = self.__class__.__name__
+        # Добавляем параметры для плавного затухания
+        self.fade_frames = 20  # Количество фреймов для затухания
+        self.current_fade_counter = 0  # Текущий счетчик затухания
+        self.is_fading = False  # Флаг состояния затухания
+        self.last_voice_detected = False  # Последнее состояние детекции речи
+
+        # Добавляем общие параметры обработки аудио
+        self.sample_rate = 16000
+        self.frame_duration = 20  # мс
+        self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
+        
+        # История детекции речи
+        self.speech_history = []
+        self.history_size = 3
+        self.sensitivity = 0.2
 
     def connect_input(self, input_queue):
         """Подключение входной очереди."""
@@ -89,14 +104,93 @@ class VADBase(ABC):
         """Добавление аудиоданных в буфер."""
         self.audio_buffer.add_data(audio_data)
 
-    @abstractmethod
+    def preprocess_audio(self, audio_chunk):
+        """Общая предобработка аудио для всех VAD"""
+        try:
+            if not isinstance(audio_chunk, np.ndarray):
+                raise ValueError("Input is not numpy array")
+
+            # Нормализация до float32 [-1, 1]
+            if audio_chunk.dtype != np.float32:
+                audio_chunk = audio_chunk.astype(np.float32)
+            if np.max(np.abs(audio_chunk)) > 1.0:
+                audio_chunk = audio_chunk / 32768.0
+
+            # Преобразование в int16
+            audio_int16 = (audio_chunk * 32767).astype(np.int16)
+            return audio_int16
+            
+        except Exception as e:
+            self.send_exception(e, "Audio preprocessing error")
+            return None
+
+    def split_into_frames(self, audio_data):
+        """Разделение аудио на фреймы"""
+        if len(audio_data) < self.frame_size:
+            return []
+            
+        num_frames = len(audio_data) // self.frame_size
+        frame_length = num_frames * self.frame_size
+        return np.array_split(audio_data[:frame_length], num_frames)
+
+    def update_speech_history(self, is_speech: bool) -> bool:
+        """Обновление истории речи и проверка порога"""
+        self.speech_history.append(is_speech)
+        self.speech_history = self.speech_history[-self.history_size:]
+        
+        if len(self.speech_history) >= self.history_size:
+            speech_ratio = sum(self.speech_history) / len(self.speech_history)
+            return speech_ratio >= self.sensitivity
+        return False
+
     def detect_voice(self, audio_chunk):
-        """Определение наличия голоса в аудиоданных."""
-        pass
+        """Общая логика детекции голоса с предобработкой"""
+        start_time = time.time()
+        try:
+            # Предобработка аудио
+            processed_audio = self.preprocess_audio(audio_chunk)
+            if processed_audio is None:
+                return False
+
+            # Разделение на фреймы
+            frames = self.split_into_frames(processed_audio)
+            if not frames:
+                return False
+
+            # Анализ фреймов
+            raw_voice_detected = False
+            for frame in frames:
+                if len(frame) == self.frame_size:
+                    frame_has_speech = self.process_frame(frame)
+                    if self.update_speech_history(frame_has_speech):
+                        raw_voice_detected = True
+                        break
+
+            # Применяем логику затухания
+            final_voice_detected = self.apply_fade_logic(raw_voice_detected)
+
+            # Отправляем расширенный статус
+            self.send_status(
+                "processing",
+                frames_total=len(frames),
+                frames_with_speech=sum(self.speech_history),
+                frame_size=self.frame_size,
+                raw_voice_detected=raw_voice_detected,
+                voice_detected=final_voice_detected,
+                is_fading=self.is_fading,
+                fade_counter=self.current_fade_counter,
+                performance={'processing_time_ms': (time.time() - start_time) * 1000}
+            )
+
+            return final_voice_detected
+
+        except Exception as e:
+            self.send_exception(e, "VAD processing error")
+            return False
 
     @abstractmethod
-    def get_chunk_size(self):
-        """Возвращает размер чанка, необходимый для обработки."""
+    def process_frame(self, frame):
+        """Абстрактный метод обработки отдельного фрейма"""
         pass
 
     def send_status(self, status: str, **details):
@@ -126,7 +220,31 @@ class VADBase(ABC):
 
     def get_config(self):
         """Получение конфигурации VAD для логирования"""
-        return {}  # Базовая реализация
+        return {
+            'fade_frames': self.fade_frames,
+            'is_fading': self.is_fading,
+            'fade_counter': self.current_fade_counter
+        }
+
+    def apply_fade_logic(self, voice_detected: bool) -> bool:
+        """Применение логики плавного затухания"""
+        # При обнаружении речи сразу сбрасываем затухание
+        if voice_detected:
+            self.is_fading = False
+            self.current_fade_counter = self.fade_frames
+            self.last_voice_detected = True
+            return True
+
+        # Если речь не обнаружена, но есть активное затухание
+        if self.current_fade_counter > 0:
+            self.is_fading = True
+            self.current_fade_counter -= 1
+            return True
+        
+        # Речь не обнаружена и затухание завершено
+        self.is_fading = False
+        self.last_voice_detected = False
+        return False
 
     def _update_state(self, new_state):
         """Обновление состояния VAD и отправка статуса при изменении."""
@@ -181,157 +299,6 @@ class VADBase(ABC):
                 break
 
 
-class NullVAD(VADBase):
-    def detect_voice(self, audio_chunk):
-        """Всегда возвращает True (речь обнаружена)."""
-        return True
-
-    def get_chunk_size(self):
-        """Возвращает размер чанка для Null VAD."""
-        return 16000  # Пример: 1 секунда аудио при 16 кГц
-
-
-class WebRTCVAD(VADBase):
-    def __init__(self, aggressiveness=3):
-        super().__init__()
-        self.vad = webrtcvad.Vad(aggressiveness)
-        self.aggressiveness = aggressiveness
-        self.sample_rate = 16000
-        self.frame_duration = 20  # Уменьшаем до 20мс
-        self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
-        self.min_speech_frames = 1
-        self.speech_history = []  # Добавляем историю детекции
-        self.history_size = 3     # Размер истории в фреймах
-        self.sensitivity = 0.2    # Уменьшаем порог до 20%
-
-    def get_chunk_size(self):
-        """Возвращает размер чанка для WebRTC VAD."""
-        return int(self.sample_rate * self.frame_duration / 1000)
-
-    def get_config(self):
-        """Возвращает конфигурацию WebRTC VAD"""
-        return {
-            'aggressiveness': self.aggressiveness,
-            'sample_rate': self.sample_rate,
-            'frame_duration': self.frame_duration,
-            'frame_size': self.get_chunk_size()
-        }
-
-    def send_exception(self, e: Exception, message: str = None, **kwargs):
-        """Send exception through status message"""
-        if self.control_queue:
-            error_details = {
-                'error': str(e),
-                'message': message or str(e),
-                'vad_id': self.vad_id,
-                **kwargs
-            }
-            self.send_status('error', **error_details)
-
-    def detect_voice(self, audio_chunk):
-        """Анализ аудиоданных с улучшенной чувствительностью"""
-        start_time = time.time()
-        try:
-            # Проверка и преобразование входных данных
-            if not isinstance(audio_chunk, np.ndarray):
-                self.send_status("error", error="Input is not numpy array")
-                return False
-
-            # Нормализация до float32 [-1, 1]
-            if audio_chunk.dtype != np.float32:
-                audio_chunk = audio_chunk.astype(np.float32)
-            max_abs = np.max(np.abs(audio_chunk))
-            if max_abs > 1.0:  
-                audio_chunk = audio_chunk / 32768.0
-
-            # Преобразование в int16 для VAD
-            audio_int16 = (audio_chunk * 32767).astype(np.int16)
-            
-            if len(audio_int16) < self.frame_size:
-                return False
-
-            # Разделение на фреймы фиксированного размера
-            num_frames = len(audio_int16) // self.frame_size
-            frame_length = num_frames * self.frame_size
-            frames = np.array_split(audio_int16[:frame_length], num_frames)
-
-            # Обновляем историю детекции 
-            is_speech = False
-            for frame in frames:
-                if len(frame) == self.frame_size:
-                    frame_has_speech = self.vad.is_speech(frame.tobytes(), self.sample_rate)
-                    self.speech_history.append(frame_has_speech)
-                    # Оставляем только последние N фреймов
-                    self.speech_history = self.speech_history[-self.history_size:]
-                    
-                    # Проверяем историю для принятия решения 
-                    if len(self.speech_history) >= self.history_size:
-                        speech_ratio = sum(self.speech_history) / len(self.speech_history)
-                        is_speech = speech_ratio >= self.sensitivity
-                        if is_speech:
-                            break
-
-            # Отправляем статус
-            processing_time = time.time() - start_time
-            self.send_status(
-                "processing",
-                frames_total=len(frames),
-                frames_with_speech=sum(self.speech_history),
-                frame_size=self.frame_size,
-                voice_detected=is_speech,
-                performance={'processing_time_ms': processing_time * 1000}
-            )
-
-            return is_speech
-
-        except Exception as e:
-            import traceback
-            self.send_exception(
-                e, 
-                "VAD processing error",
-                traceback=traceback.format_exc(),
-                frame_info={
-                    'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
-                    'frame_size': self.frame_size
-                }
-            )
-            return False
-
-    def process(self):
-        """Обработка аудиоданных из буфера."""
-        chunk_size = self.get_chunk_size()
-        audio_chunk = self.audio_buffer.get_chunk(chunk_size)
-        if audio_chunk is None:
-            return None  # Недостаточно данных для обработки
-
-        try:
-            voice_detected = self.detect_voice(audio_chunk)
-            self._update_state("speech" if voice_detected else "silence")
-            
-            # Send detailed status
-            self.send_status(
-                "processing",
-                voice_detected=voice_detected,
-                chunk_size=chunk_size,
-                buffer_size=len(self.audio_buffer.buffer)
-            )
-            
-            return audio_chunk if voice_detected else None
-            
-        except Exception as e:
-            self.send_exception(
-                e,
-                "VAD buffer processing error",
-                level="error",
-                error_location=f"WebRTCVAD[{self.vad_id}].process",
-                buffer_info={
-                    'buffer_size': len(self.audio_buffer.buffer),
-                    'chunk_size': self.get_chunk_size()
-                }
-            )
-            return None
-
-
 class SileroVAD(VADBase):
     def __init__(self):
         super().__init__()
@@ -376,6 +343,36 @@ class OpenVINOVAD(VADBase):
     def get_chunk_size(self):
         """Возвращает размер чанка для OpenVINO VAD."""
         return 16000  # Пример: 1 секунда аудио при 16 кГц
+
+
+class WebRTCVAD(VADBase):
+    def __init__(self, aggressiveness=3):
+        super().__init__()
+        self.vad = webrtcvad.Vad(aggressiveness)
+        self.aggressiveness = aggressiveness
+
+    def process_frame(self, frame):
+        """Обработка отдельного фрейма для WebRTC VAD"""
+        try:
+            return self.vad.is_speech(frame.tobytes(), self.sample_rate)
+        except Exception as e:
+            self.send_exception(e, "WebRTC frame processing error")
+            return False
+
+    def get_chunk_size(self):
+        """Возвращает размер чанка для WebRTC VAD."""
+        return self.frame_size
+
+    def get_config(self):
+        """Возвращает расширенную конфигурацию WebRTC VAD"""
+        config = super().get_config()
+        config.update({
+            'aggressiveness': self.aggressiveness,
+            'sample_rate': self.sample_rate,
+            'frame_duration': self.frame_duration,
+            'frame_size': self.frame_size
+        })
+        return config
 
 
 def create_vad(args):

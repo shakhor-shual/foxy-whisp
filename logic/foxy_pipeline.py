@@ -645,6 +645,20 @@ class ASRstage(PipelineElement):
             # Создаем директорию если её нет
             os.makedirs(self.debug_dir, exist_ok=True)
             
+            # Проверяем и удаляем существующий файл
+            if os.path.exists(self.debug_file_path):
+                try:
+                    os.remove(self.debug_file_path)
+                    self.send_log("Removed existing debug file", 
+                                level="debug",
+                                details={'file': self.debug_file_path})
+                except Exception as e:
+                    self.send_exception(
+                        e,
+                        "Failed to remove existing debug file",
+                        component="debug_recorder"
+                    )
+            
             # Открываем файл для записи
             self.debug_file = sf.SoundFile(
                 self.debug_file_path,
