@@ -1,216 +1,108 @@
-=== New Session Пн 31 мар 2025 08:41:04 CEST ===
+=== New Session Пн 31 мар 2025 09:16:02 CEST ===
 Found script at: /home/ubuntu/foxy-whisp/foxy_whisp_gui.py
 /home/ubuntu/foxy-whisp/logic/foxy_whisp_gui.py
 [SERVER] Sent test message #0
-AudioDeviceSource: Message sent: MessageType.STATUS, Content: {'status': 'starting', 'details': {}}
-AudioDeviceSource: Message sent: MessageType.LOG, Content: {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None}}
-AudioDeviceSource Log: [info] Audio stream started {'samplerate': 16000, 'blocksize': 320, 'device': None}
-AudioDeviceSource: Message sent: MessageType.STATUS, Content: {'status': 'configured', 'details': {}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.5072389, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.6139271, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743403267.7206297, 'is_silence': False}}
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743403267.3779354}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info'}, 'timestamp': 1743403267.3794568}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.STATUS, Content: {'status': 'starting', 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.LOG, Content: {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource Log: [info] Audio stream started {'samplerate': 16000, 'blocksize': 320, 'device': None, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.STATUS, Content: {'status': 'configured', 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743405365.342497, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.4492295, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.555892, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'server_initialized', 'details': {}}, 'timestamp': 1743405365.2073932}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #0 from server', 'level': 'info'}, 'timestamp': 1743405365.2092288}
 [GUI] Test message received: Test message #0 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #0 from server
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743403267.8273492, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 6, 'timestamp': 1743403267.9339294, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.0406032, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.1472654, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743403268.2539995, 'is_silence': False}}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743403268.3605902, 'is_silence': False}}
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'server_initialized', Message: 'server_initialized', Filters: set()
-[DEBUG] Message accepted - server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #0 from server', Filters: set()
-[DEBUG] Message accepted - test
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 17, 'timestamp': 1743405365.6625597, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743405365.7691767, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 22, 'timestamp': 1743405365.8758814, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.9825265, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 20, 'timestamp': 1743405366.089195, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 17, 'timestamp': 1743405366.1958709, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
 [SERVER] Processing message from GUI: MessageType.COMMAND
 [SERVER] Received command: get_audio_devices
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743403268.4043179}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'pipeline_started', Message: 'pipeline_started (details={'state': 'running'})', Filters: set()
-[DEBUG] Message accepted - server
-AudioDeviceSource: Message sent: MessageType.LOG, Content: {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1}}
-AudioDeviceSource Log: [debug] Buffer accumulated {'size': 320, 'queue_size': 1}
-AudioDeviceSource: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 8, 'timestamp': 1743403268.467222, 'is_silence': False}}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_started', 'details': {'details': {'state': 'running'}}}, 'timestamp': 1743405366.2350593}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.LOG, Content: {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
+AudioDeviceSource Log: [debug] Buffer accumulated {'size': 320, 'queue_size': 1, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}
+AudioDeviceSource[audio_device_132507346673376]: Message sent: MessageType.DATA, Content: {'data_type': 'audio_level', 'payload': {'level': 19, 'timestamp': 1743405366.302479, 'is_silence': False}, 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}
 [SERVER] Processing message from src: MessageType.LOG
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'buffer_size': 80000}}, 'timestamp': 1743403267.3807557}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] SRC stage initialized
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage initialized', 'level': 'info', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}, 'details': {'buffer_size': 80000}}}, 'timestamp': 1743405365.210439}
 [SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 229969)', 'level': 'info'}, 'timestamp': 1743403267.3892155}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] Process started (PID: 229969)
 [SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.5062685}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info'}, 'timestamp': 1743403267.3919024}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] Configuring audio_device source
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.5067382}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None}}, 'timestamp': 1743403267.420945}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] Audio stream started
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.5072243}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.5075457}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info'}, 'timestamp': 1743403267.4210637}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] SRC stage configured and running
-[SERVER] Processing message from src: MessageType.DATA[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.5072389, 'is_silence': False}}, 'timestamp': 1743403268.5079951}
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 331950)', 'level': 'info', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}}}, 'timestamp': 1743405365.2196243}[SERVER] Processing message from src: MessageType.STATUS
 
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403267.6139271, 'is_silence': False}}, 'timestamp': 1743403268.50834}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743403267.7206297, 'is_silence': False}}, 'timestamp': 1743403268.5086076}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 12, 'timestamp': 1743403267.8273492, 'is_silence': False}}, 'timestamp': 1743403268.5088825}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 6, 'timestamp': 1743403267.9339294, 'is_silence': False}}, 'timestamp': 1743403268.5092177}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.0406032, 'is_silence': False}}, 'timestamp': 1743403268.509514}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 13, 'timestamp': 1743403268.1472654, 'is_silence': False}}, 'timestamp': 1743403268.5096931}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743403268.2539995, 'is_silence': False}}, 'timestamp': 1743403268.510001}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 11, 'timestamp': 1743403268.3605902, 'is_silence': False}}, 'timestamp': 1743403268.5102525}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[SERVER] Processing message from src: MessageType.DATA
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1}}, 'timestamp': 1743403268.4531589}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.debug] Buffer accumulated
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 8, 'timestamp': 1743403268.467222, 'is_silence': False}}, 'timestamp': 1743403268.510854}
-[GUI] Processing message - Type: MessageType.DATA, Source: src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage initialized', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Process started (PID: 229969)', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Configuring audio_device source', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'starting', Message: 'starting', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'Audio stream started', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'configured', Message: 'configured', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage configured and running', Filters: set()
-[DEBUG] Message accepted - src
-[SERVER] Processing message from src: MessageType.LOG
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'debug', Message: 'Buffer accumulated', Filters: set()
-[DEBUG] Message accepted - src
-[SERVER] Processing message from src: MessageType.STATUS
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error', 'details': {'exception_type': 'ValueError'}}, 'timestamp': 1743403268.514984}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'level': 'error'}, 'timestamp': 1743403268.5164452}
-[GUI] Processing message - Type: MessageType.LOG, Source: server
-[GUI] Formatted log message: [server.error] SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-[SERVER] Processing message from src: MessageType.LOG
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'error', 'details': {'error': 'The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()'}}, 'timestamp': 1743403268.516941}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage stopping', 'level': 'info'}, 'timestamp': 1743403268.5150921}
-[GUI] Processing message - Type: MessageType.LOG, Source: src
-[GUI] Formatted log message: [src.info] SRC stage stopping[SERVER] Processing message from src: MessageType.STATUS
+[SERVER] Processing message from src: MessageType.LOG[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743405366.3369794}
 
-[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'stopped', 'details': {}}, 'timestamp': 1743403268.5174391}
-[GUI] Processing message - Type: MessageType.STATUS, Source: src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'error', Message: 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'error', Message: 'SRC error: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', Filters: set()
-[DEBUG] Message accepted - server
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'error', Message: 'error (error=The truth value of an array with more than one element is ambiguous. Use a.any() or a.all())', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'info', Message: 'SRC stage stopping', Filters: set()
-[DEBUG] Message accepted - src
-[DEBUG] Processing message - Original source: 'src', Normalized source: 'src', Level: 'stopped', Message: 'stopped', Filters: set()
-[DEBUG] Message accepted - src
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Configuring audio_device source', 'level': 'info', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}}}, 'timestamp': 1743405365.2220142}[SERVER] Processing message from src: MessageType.STATUS
+
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}, 'timestamp': 1743405366.3374276}
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Audio stream started', 'level': 'info', 'details': {'samplerate': 16000, 'blocksize': 320, 'device': None, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}, 'timestamp': 1743405365.2490191}[SERVER] Processing message from src: MessageType.LOG
+
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}, 'timestamp': 1743405366.3379633}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743405366.3382177}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage configured and running', 'level': 'info', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}}}, 'timestamp': 1743405365.2492812}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743405365.342497, 'is_silence': False}}, 'timestamp': 1743405366.3387945}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.4492295, 'is_silence': False}}, 'timestamp': 1743405366.3390894}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.555892, 'is_silence': False}}, 'timestamp': 1743405366.3393517}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 17, 'timestamp': 1743405365.6625597, 'is_silence': False}}, 'timestamp': 1743405366.3396144}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 16, 'timestamp': 1743405365.7691767, 'is_silence': False}}, 'timestamp': 1743405366.3398464}
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 22, 'timestamp': 1743405365.8758814, 'is_silence': False}}, 'timestamp': 1743405366.3400702}
+[SERVER] Processing message from src: MessageType.DATA[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 15, 'timestamp': 1743405365.9825265, 'is_silence': False}}, 'timestamp': 1743405366.3403215}
+
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 20, 'timestamp': 1743405366.089195, 'is_silence': False}}, 'timestamp': 1743405366.34056}
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 17, 'timestamp': 1743405366.1958709, 'is_silence': False}}, 'timestamp': 1743405366.3407972}
+[SERVER] Processing message from src: MessageType.LOG
+[SERVER] Processing message from src: MessageType.DATA
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Buffer accumulated', 'level': 'debug', 'details': {'size': 320, 'queue_size': 1, 'source_id': 'audio_device_132507346673376', 'source_type': 'audio_device', 'device_info': {'name': 'default', 'samplerate': 16000, 'blocksize': 320}}}, 'timestamp': 1743405366.27572}
+[GUI] Raw message received: {'source': 'src.audio_device', 'type': <MessageType.DATA: 3>, 'content': {'data_type': 'audio_level', 'payload': {'level': 19, 'timestamp': 1743405366.302479, 'is_silence': False}}, 'timestamp': 1743405366.3413365}
+[SERVER] Processing message from src: MessageType.LOG
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage error', 'level': 'error', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}, 'error_details': {'exception': {'type': 'ValueError', 'message': 'The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', 'traceback': ['Traceback (most recent call last):', '  File "/home/ubuntu/foxy-whisp/logic/foxy_pipeline.py", line 426, in _run', '    if audio_data := self.source.receive_audio():', '       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', 'ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()', '']}, 'component': 'main', 'component_info': {'stage_id': 'src_132507346898336', 'stage_type': 'src'}}}}, 'timestamp': 1743405366.3457482}
+[SERVER] Processing message from src: MessageType.LOG
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage error', 'level': 'error'}, 'timestamp': 1743405366.3474498}
+[SERVER] Processing message from src: MessageType.STATUS
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'error', 'details': {'error': 'The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()'}}, 'timestamp': 1743405366.3479433}
+[GUI] Raw message received: {'source': 'src.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'SRC stage stopping', 'level': 'info', 'details': {'stage_id': 'src_132507346898336', 'stage_type': 'src', 'component_info': {}}}, 'timestamp': 1743405366.3458588}
+[GUI] Raw message received: {'source': 'src', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'stopped', 'details': {}}, 'timestamp': 1743405366.3485005}
 [SERVER] Processing message from asr: MessageType.LOG
 [SERVER] Processing message from asr: MessageType.LOG
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info'}, 'timestamp': 1743403267.3816166}
-[GUI] Processing message - Type: MessageType.LOG, Source: asr
-[GUI] Formatted log message: [asr.info] ASR stage initialized
+[GUI] Raw message received: {'source': 'asr.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'ASR stage initialized', 'level': 'info', 'context': {'process_info': {'pid': 331945, 'thread_id': 132512122894144, 'component': 'ASRstage', 'timestamp': 1743405365.2114022}, 'execution_context': {'component': 'main', 'stage': 'asrstage'}}}, 'timestamp': 1743405365.2114284}
 [SERVER] Processing message from asr: MessageType.STATUS
+[GUI] Raw message received: {'source': 'asr.main', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 331964)', 'level': 'info', 'context': {'process_info': {'pid': 331945, 'thread_id': 132512122894144, 'component': 'ASRstage', 'timestamp': 1743405365.7344062}, 'execution_context': {'component': 'main', 'stage': 'asrstage'}}}, 'timestamp': 1743405365.7345512}
 [SERVER] Processing message from asr: MessageType.STATUS
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Process started (PID: 230050)', 'level': 'info'}, 'timestamp': 1743403267.9036975}
-[GUI] Processing message - Type: MessageType.LOG, Source: asr
-[GUI] Formatted log message: [asr.info] Process started (PID: 230050)
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743403268.618332}
-[GUI] Processing message - Type: MessageType.STATUS, Source: asr
-[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743403268.6186862}
-[GUI] Processing message - Type: MessageType.STATUS, Source: asr
-[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'info', Message: 'ASR stage initialized', Filters: set()
-[DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'info', Message: 'Process started (PID: 230050)', Filters: set()
-[DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'starting', Message: 'starting', Filters: set()
-[DEBUG] Message accepted - asr
-[DEBUG] Processing message - Original source: 'asr', Normalized source: 'asr', Level: 'configured', Message: 'configured', Filters: set()
-[DEBUG] Message accepted - asr
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'starting', 'details': {}}, 'timestamp': 1743405366.449936}
+[GUI] Raw message received: {'source': 'asr', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'configured', 'details': {}}, 'timestamp': 1743405366.4502518}
 [SERVER] Sent test message #1
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info'}, 'timestamp': 1743403272.3811991}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #1 from server', 'level': 'info'}, 'timestamp': 1743405370.2109134}
 [GUI] Test message received: Test message #1 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #1 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #1 from server', Filters: set()
-[DEBUG] Message accepted - test
-[GUI.DEBUG] Starting recording
-[SERVER] Processing message from GUI: MessageType.COMMAND
-[SERVER] Received command: start_recording
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'recording_started', 'details': {}}, 'timestamp': 1743403273.2290716}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[DEBUG] Processing message - Original source: 'server', Normalized source: 'server', Level: 'recording_started', Message: 'recording_started', Filters: set()
-[DEBUG] Message accepted - server
 [SERVER] Sent test message #2
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info'}, 'timestamp': 1743403277.3815258}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #2 from server', 'level': 'info'}, 'timestamp': 1743405375.2112665}
 [GUI] Test message received: Test message #2 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #2 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #2 from server', Filters: set()
-[DEBUG] Message accepted - test
 [SERVER] Sent test message #3
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info'}, 'timestamp': 1743403282.3818045}
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #3 from server', 'level': 'info'}, 'timestamp': 1743405380.2118826}
 [GUI] Test message received: Test message #3 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #3 from server
-[DEBUG] Processing message - Original source: 'test', Normalized source: 'test', Level: 'info', Message: 'Test message #3 from server', Filters: set()
-[DEBUG] Message accepted - test
+[SERVER] Sent test message #4
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #4 from server', 'level': 'info'}, 'timestamp': 1743405385.212185}
+[GUI] Test message received: Test message #4 from server
+[SERVER] Sent test message #5
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #5 from server', 'level': 'info'}, 'timestamp': 1743405390.2124815}
+[GUI] Test message received: Test message #5 from server
 [SERVER] Processing message from GUI: MessageType.COMMAND
 [SERVER] Received command: stop
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743403283.7113235}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743403283.9325573}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[SERVER] Sent test message #4
-[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #4 from server', 'level': 'info'}, 'timestamp': 1743403287.3820984}
-[GUI] Test message received: Test message #4 from server
-[GUI] Processing message - Type: MessageType.LOG, Source: test
-[GUI] Formatted log message: [test.info] Test message #4 from server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743403288.7882397}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743403288.78839}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
-[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743403288.888696}
-[GUI] Processing message - Type: MessageType.STATUS, Source: server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743405393.9084141}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743405394.011663}
+[SERVER] Sent test message #6
+[GUI] Raw message received: {'source': 'test', 'type': <MessageType.LOG: 1>, 'content': {'message': 'Test message #6 from server', 'level': 'info'}, 'timestamp': 1743405395.212772}
+[GUI] Test message received: Test message #6 from server
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'shutdown', 'details': {'reason': 'Signal SIGTERM received'}}, 'timestamp': 1743405398.8746862}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopping', 'details': {}}, 'timestamp': 1743405398.8747952}
+[GUI] Raw message received: {'source': 'server', 'type': <MessageType.STATUS: 2>, 'content': {'status': 'pipeline_stopped', 'details': {'details': {'state': 'stopped'}}}, 'timestamp': 1743405398.9750695}

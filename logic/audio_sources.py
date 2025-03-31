@@ -24,6 +24,7 @@ class AudioDeviceSource:
         self.container = container  # Reference to src-stage container
         self.last_level_time = time.time()  # Initialize with current time
         self.debug_enabled = True  # Добавляем флаг отладки
+        self.source_id = f"audio_device_{id(self)}"  # Уникальный идентификатор источника
 
     @staticmethod
     def list_devices():
@@ -56,23 +57,39 @@ class AudioDeviceSource:
         """Унифицированный метод отправки сообщений"""
         if not self.container or not hasattr(self.container, 'out_queue'):
             if self.debug_enabled:
-                print(f"AudioDeviceSource: Can't send message - no container queue: {content}")
+                print(f"AudioDeviceSource[{self.source_id}]: Can't send message - no container queue")
             return False
 
         try:
+            # Добавляем source_info в детали сообщения
+            source_info = {
+                'source_id': self.source_id,
+                'source_type': 'audio_device',
+                'device_info': {
+                    'name': sd.query_devices(self.device)['name'] if self.device is not None else 'default',
+                    'samplerate': self.samplerate,
+                    'blocksize': self.blocksize
+                }
+            }
+            
+            if 'details' in content:
+                content['details'].update(source_info)
+            else:
+                content['details'] = source_info
+
             msg = PipelineMessage(
-                source='src',  # Важно: используем 'src' как источник
+                source='src.audio_device',  # Изменяем формат source
                 type=msg_type,
                 content=content
             )
             msg.send(self.container.out_queue)
             
             if self.debug_enabled:
-                print(f"AudioDeviceSource: Message sent: {msg_type}, Content: {content}")
+                print(f"AudioDeviceSource[{self.source_id}]: Message sent: {msg_type}, Content: {content}")
             return True
         except Exception as e:
             if self.debug_enabled:
-                print(f"AudioDeviceSource: Failed to send message: {e}")
+                print(f"AudioDeviceSource[{self.source_id}]: Failed to send message: {e}")
             return False
 
     def log(self, level: str, message: str, **details):
@@ -104,6 +121,15 @@ class AudioDeviceSource:
             'details': details
         }
         return self._send_message(MessageType.STATUS, content)
+
+    def send_exception(self, exception, message, **details):
+        """Send exception details through PipelineMessage"""
+        content = {
+            'message': message,
+            'exception': str(exception),
+            **details
+        }
+        self._send_message(MessageType.EXCEPTION, content)
 
     def run(self):
         # Проверяем состояние stop_event перед запуском
@@ -156,8 +182,12 @@ class AudioDeviceSource:
     def callback(self, indata, frames, time_info, status):
         """Callback-функция для обработки аудиоданных."""
         if status:
-            self.log("warning", "Audio callback status", 
-                    status=str(status), frames=frames)
+            self.send_exception(
+                status,
+                "Audio callback status",
+                level="warning",
+                frames=frames
+            )
         
         try:
             # Convert to float32 and normalize for level calculation
@@ -188,16 +218,37 @@ class AudioDeviceSource:
                         queue_size=len(self.internal_queue))
 
         except Exception as e:
-            self.log("error", "Audio processing error",
-                    error=str(e),
-                    frames=frames,
-                    buffer_size=len(self.accumulation_buffer))
+            self.send_exception(
+                e,
+                "Audio processing error",
+                level="error",
+                frames=frames,
+                buffer_size=len(self.accumulation_buffer)
+            )
 
     def receive_audio(self):
         """Извлечение аудиоданных из внутренней очереди."""
-        if self.internal_queue:
-            return self.internal_queue.popleft()
-        return None
+        try:
+            if self.internal_queue:
+                data = self.internal_queue.popleft()
+                # Проверяем что данные валидны
+                if not isinstance(data, np.ndarray):
+                    raise ValueError("Invalid audio data type")
+                if data.size == 0:
+                    raise ValueError("Empty audio data")
+                return data
+            return None
+        except Exception as e:
+            self.send_exception(
+                e,
+                "Error receiving audio data",
+                level="error",
+                details={
+                    'queue_size': len(self.internal_queue) if self.internal_queue else 0,
+                    'error_type': type(e).__name__
+                }
+            )
+            return None
 
     def _process_audio(self, indata):
         """Обработка аудиоданных: преобразование стерео в моно, ресемплинг и т.д."""
@@ -228,28 +279,44 @@ class TCPSource:
         self.container = container  # Reference to src-stage container
         self.name = "tcp"  # Добавляем имя для логов
         self.debug_enabled = True  # Включаем отладку
+        self.source_id = f"tcp_{id(self)}"  # Уникальный идентификатор источника
 
     def _send_message(self, msg_type: MessageType, content: dict):
         """Унифицированный метод отправки сообщений"""
         if not self.container or not hasattr(self.container, 'out_queue'):
             if self.debug_enabled:
-                print(f"TCPSource: Can't send message - no container queue: {content}")
+                print(f"TCPSource[{self.source_id}]: Can't send message - no container queue")
             return False
 
         try:
+            # Добавляем source_info в детали сообщения
+            source_info = {
+                'source_id': self.source_id,
+                'source_type': 'tcp',
+                'connection_info': {
+                    'host': self.host,
+                    'port': self.port
+                }
+            }
+            
+            if 'details' in content:
+                content['details'].update(source_info)
+            else:
+                content['details'] = source_info
+
             msg = PipelineMessage(
-                source='src',  # Всегда используем 'src' как источник
+                source='src.tcp',  # Изменяем формат source
                 type=msg_type,
                 content=content
             )
             msg.send(self.container.out_queue)
             
             if self.debug_enabled:
-                print(f"TCPSource: Message sent: {msg_type}, Content: {content}")
+                print(f"TCPSource[{self.source_id}]: Message sent: {msg_type}, Content: {content}")
             return True
         except Exception as e:
             if self.debug_enabled:
-                print(f"TCPSource: Failed to send message: {e}")
+                print(f"TCPSource[{self.source_id}]: Failed to send message: {e}")
             return False
 
     def log(self, level: str, message: str, **details):
@@ -264,6 +331,15 @@ class TCPSource:
         if self._send_message(MessageType.LOG, content):
             if self.debug_enabled:
                 print(f"TCPSource Log: [{level}] {message} {details if details else ''}")
+
+    def send_exception(self, exception, message, **details):
+        """Send exception details through PipelineMessage"""
+        content = {
+            'message': message,
+            'exception': str(exception),
+            **details
+        }
+        self._send_message(MessageType.EXCEPTION, content)
 
     def run(self):
         try:
@@ -319,7 +395,12 @@ class TCPSource:
                     break
 
         except Exception as e:
-            self.log("error", f"Failed to start TCP server: {str(e)}")
+            self.send_exception(
+                e,
+                "Failed to start TCP server",
+                level="error",
+                component="tcp_server"
+            )
             raise
         finally:
             if self.socket:

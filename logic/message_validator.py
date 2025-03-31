@@ -14,31 +14,80 @@ class MessageSource(Enum):
 
     @classmethod
     def normalize(cls, source: str) -> str:
-        """Normalize source name to standard form"""
+        """Normalize source name with component support"""
+        # Handle compound sources (e.g. 'src.vad.info')
+        parts = source.lower().split('.')
+        base_source = parts[0]
+        
+        # Normalize base source
         source_map = {
             "srcstage": cls.SRC.value,
             "asrstage": cls.ASR.value,
             "system": cls.SERVER.value,
             "pipeline": cls.SERVER.value,
-            "tcp": cls.SRC.value,  # TCP сообщения нормализуем как сообщения от SRC
+            "tcp": cls.SRC.value,
+            "audio_device": cls.SRC.value,
+            "vad": cls.SRC.value,
         }
-        return source_map.get(source.lower(), source.lower())
+        
+        normalized_base = source_map.get(base_source, base_source)
+        
+        # Return either base source or compound source
+        if len(parts) > 1:
+            return f"{normalized_base}.{'.'.join(parts[1:])}"
+        return normalized_base
 
 class MessageValidator:
     @staticmethod
     def validate_log_content(content: Dict[str, Any]) -> bool:
         """Validate log message content"""
-        required_fields = {'message', 'level'}
-        valid_levels = {'debug', 'info', 'warning', 'error'}
-        
-        if not all(field in content for field in required_fields):
+        # Базовые требования для всех лог-сообщений
+        if not isinstance(content, dict):
             return False
             
-        if content['level'] not in valid_levels:
+        if 'message' not in content or not isinstance(content['message'], str):
             return False
             
-        if not isinstance(content['message'], str):
+        if 'level' not in content or content['level'] not in {'debug', 'info', 'warning', 'error', 'critical'}:
             return False
+            
+        # Валидация расширенного контекста
+        if 'context' in content:
+            ctx = content['context']
+            if not isinstance(ctx, dict):
+                return False
+                
+            # Проверяем process_info если есть
+            if 'process_info' in ctx:
+                p_info = ctx['process_info']
+                if not isinstance(p_info, dict):
+                    return False
+                required_proc_fields = {'pid', 'thread_id', 'component', 'timestamp'}
+                if not all(k in p_info for k in required_proc_fields):
+                    return False
+                    
+            # Проверяем execution_context если есть
+            if 'execution_context' in ctx:
+                e_ctx = ctx['execution_context']
+                if not isinstance(e_ctx, dict):
+                    return False
+                required_exec_fields = {'component', 'stage'}
+                if not all(k in e_ctx for k in required_exec_fields):
+                    return False
+                    
+            # Проверяем error_info для ошибок
+            if 'error_info' in ctx:
+                err_info = ctx['error_info']
+                if not isinstance(err_info, dict):
+                    return False
+                if 'traceback' in err_info and not isinstance(err_info['traceback'], (list, str)):
+                    return False
+                
+        # Проверяем error_details если есть (для обратной совместимости)
+        if 'error_details' in content:
+            err_details = content['error_details']
+            if not isinstance(err_details, dict):
+                return False
             
         return True
 
@@ -85,9 +134,11 @@ class MessageValidator:
 
     @staticmethod
     def validate_source(source: str) -> bool:
-        """Validate message source"""
+        """Validate message source with component support"""
         try:
-            normalized = MessageSource.normalize(source)
+            # Split compound source
+            base_source = source.split('.')[0].lower()
+            normalized = MessageSource.normalize(base_source)
             return normalized in [member.value for member in MessageSource]
         except:
             return False

@@ -491,50 +491,44 @@ class FoxyWhispGUI:
         self.root.destroy()
 
     def append_text(self, text: str):
-        """Append text to the display area with filtering"""
+        """Append text with improved message parsing"""
         try:
             if text.startswith('[') and ']' in text:
                 parts = text[1:].split(']', 1)
                 if len(parts) == 2:
-                    source_level = parts[0].lower()
+                    source_parts = parts[0].lower().split('.')
                     message = parts[1].strip()
                     
-                    # Разбор source и level
-                    if '.' in source_level:
-                        source, level = source_level.rsplit('.', 1)
-                    else:
-                        source = source_level
-                        level = 'info'
+                    # Extract components
+                    base_source = source_parts[0]
+                    level = source_parts[-1] if len(source_parts) > 1 else 'info'
+                    component = '.'.join(source_parts[1:-1]) if len(source_parts) > 2 else 'main'
                     
-                    # Нормализация имен источников
+                    # Apply source mapping
                     source_mappings = {
                         'srcstage': 'src',
                         'asrstage': 'asr',
-                        'system': 'server'
+                        'system': 'server',
+                        'audio_device': 'src',
+                        'tcp': 'src',
+                        'vad': 'src'
                     }
+                    base_source = source_mappings.get(base_source, base_source)
                     
-                    # Преобразуем имя источника если есть в маппинге
-                    if source in source_mappings:
-                        source = source_mappings[source]
-                    
-                    print(f"[DEBUG] Processing message - Original source: '{parts[0].split('.')[0]}', "
-                          f"Normalized source: '{source}', Level: '{level}', "
-                          f"Message: '{message}', Filters: {self.log_filter.source_filters}")
-                    
-                    # Применяем фильтры с нормализованным источником
-                    if not self.log_filter.matches(source, level, message):
-                        print(f"[DEBUG] Message filtered out - {source}")
+                    # Check filters (only base source)
+                    if not self.log_filter.matches(base_source, level, message):
                         return
                     
-                    print(f"[DEBUG] Message accepted - {source}")
+                    # Format final message
+                    text = f"[{base_source}.{component}.{level}] {message}"
+            
+            self.text.config(state=tk.NORMAL)
+            self.text.insert(tk.END, text + "\n")
+            self.text.see(tk.END)
+            self.text.config(state=tk.DISABLED)
             
         except Exception as e:
             print(f"[GUI] Message parsing error: {e}, Text: {text}")
-        
-        self.text.config(state=tk.NORMAL)
-        self.text.insert(tk.END, text + "\n")
-        self.text.see(tk.END)
-        self.text.config(state=tk.DISABLED)
 
     def append_text_safe(self, text: str):
         """Thread-safe version of append_text"""
@@ -592,22 +586,39 @@ class FoxyWhispGUI:
                 break
 
     def handle_server_message(self, msg: PipelineMessage):
-        """Handle messages from server"""
+        """Handle server messages with improved context display"""
         try:
-            print(f"[GUI] Processing message - Type: {msg.type}, Source: {msg.source}")
+            source_parts = msg.source.split('.')
+            base_source = source_parts[0]
+            component = source_parts[1] if len(source_parts) > 1 else 'main'
             
             if msg.is_log():
-                # Используем уже отформатированное сообщение, если оно есть
-                if 'formatted' in msg.content:
-                    formatted_message = msg.content['formatted']
-                else:
-                    # Форматируем сообщение сами, если нет готового формата
-                    source = msg.source.lower()
-                    level = msg.content.get('level', 'info').lower()
-                    message = msg.content.get('message', '')
-                    formatted_message = f"[{source}.{level}] {message}"
+                level = msg.content.get('level', 'info')
+                message = msg.content.get('message', '')
+                context = msg.content.get('context', {})
                 
-                print(f"[GUI] Formatted log message: {formatted_message}")
+                # Форматируем базовое сообщение
+                formatted_message = f"[{base_source}.{component}.{level}] {message}"
+                
+                # Добавляем контекст выполнения
+                if exec_context := context.get('execution_context'):
+                    context_str = ', '.join(f"{k}={v}" for k, v in exec_context.items() 
+                                          if k not in ('component', 'stage'))
+                    if context_str:
+                        formatted_message += f" ({context_str})"
+                
+                # Для ошибок добавляем расширенную информацию
+                if level in ('error', 'critical'):
+                    if error_info := context.get('error_info'):
+                        formatted_message += "\nTraceback (most recent call last):"
+                        if traceback := error_info.get('traceback'):
+                            formatted_message += '\n' + '\n'.join(f"  {line}" for line in traceback)
+                        
+                        if locals_info := error_info.get('locals'):
+                            formatted_message += "\nLocal variables:"
+                            for k, v in locals_info.items():
+                                formatted_message += f"\n  {k} = {v}"
+                
                 self.append_text_safe(formatted_message)
                 
             elif msg.is_status():
@@ -616,8 +627,14 @@ class FoxyWhispGUI:
                 self.handle_data_message(msg)
                 
         except Exception as e:
-            print(f"[GUI] Message handling error: {e}")
-            self.append_text_safe(f"[ERROR] Message processing failed: {e}")
+            import traceback
+            error_context = {
+                'traceback': traceback.format_exc(),
+                'message_type': msg.type if msg else None,
+                'message_source': msg.source if msg else None
+            }
+            self.append_text_safe(f"[ERROR] Message processing failed: {e}\n" + 
+                                  f"Traceback:\n{error_context['traceback']}")
 
     def handle_status_message(self, msg: PipelineMessage):
         """Handle status updates from server"""
@@ -682,8 +699,15 @@ class FoxyWhispGUI:
                 self.append_text_safe(f"TEST: {payload}")
                 
         except Exception as e:
-            print(f"[GUI.ERROR] Data message handling error: {e}")
-            self.append_text_safe(f"[ERROR] Data handling error: {e}")
+            import traceback
+            error_context = {
+                'traceback': traceback.format_exc(),
+                'data_type': msg.content.get('data_type'),
+                'payload_type': type(msg.content.get('payload')).__name__
+            }
+            self.append_text_safe(f"[ERROR] Data handling error: {e}\n" + 
+                                  f"Context: {error_context}\n" + 
+                                  f"Traceback:\n{error_context['traceback']}")
 
     def update_audio_level_safe(self, level):
         """Thread-safe version of update_audio_level"""

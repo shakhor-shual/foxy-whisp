@@ -11,6 +11,9 @@ from logic.foxy_message import PipelineMessage, MessageType
 from scipy.signal import resample_poly
 import numpy as np
 from logic.audio_utils import calculate_vu_meter
+import traceback
+import os
+import threading
 
 
 class PipelineElement(ABC):
@@ -33,10 +36,44 @@ class PipelineElement(ABC):
         self._process = None
 
     def send_log(self, message: str, level: str = "info", **kwargs):
+        """Enhanced logging with detailed context"""
+        source = self.__class__.__name__.lower()
+        component = kwargs.pop('component', 'main')
+        
+        # Добавляем расширенный контекст для любого типа сообщения
+        runtime_context = {
+            'process_info': {
+                'pid': os.getpid(),
+                'thread_id': threading.get_ident(),
+                'component': self.__class__.__name__,
+                'timestamp': time.time()
+            },
+            'execution_context': {
+                'component': component,
+                'stage': source,
+                **kwargs
+            }
+        }
+
+        # Если это ошибка, добавляем стектрейс
+        if level in ('error', 'critical'):
+            import traceback
+            runtime_context['error_info'] = {
+                'traceback': traceback.format_stack(),
+                'locals': {k: str(v) for k, v in locals().items() 
+                          if not k.startswith('__')}
+            }
+        
+        content = {
+            'message': message,
+            'level': level,
+            'context': runtime_context
+        }
+        
         msg = PipelineMessage(
-            source=self.__class__.__name__.lower(),
+            source=f"{source}.{component}",
             type=MessageType.LOG,
-            content={'message': message, 'level': level, **kwargs}
+            content=content
         )
         msg.send(self.out_queue)
 
@@ -90,7 +127,27 @@ class PipelineElement(ABC):
     def process(self, audio_chunk: bytes) -> Optional[bytes]:
         pass
 
+    def send_exception(self, e: Exception, message: str = None, level: str = "error", **kwargs):
+        """Send exception with full context"""
+        import traceback
+        
+        error_context = {
+            'exception': {
+                'type': type(e).__name__,
+                'message': str(e),
+                'traceback': traceback.format_exc().split('\n')
+            },
+            **kwargs
+        }
+        
+        self.send_log(
+            message=message or str(e),
+            level=level,
+            error_details=error_context
+        )
+
     def _run(self):
+        """Updated run method with enhanced error handling"""
         self.send_status('starting')
         try:
             self.configure()
@@ -101,14 +158,35 @@ class PipelineElement(ABC):
                     time.sleep(0.1)
                     continue
 
-                if data := self.audio_read():
-                    if processed := self.process(data):
-                        self.audio_write(processed)
-                else:
-                    time.sleep(0.01)
+                try:
+                    if data := self.audio_read():
+                        if processed := self.process(data):
+                            self.audio_write(processed)
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    # Отправляем детальную информацию об ошибке
+                    self.send_exception(
+                        e,
+                        f"Error processing data in {self.__class__.__name__}",
+                        component_info={
+                            'state': 'processing',
+                            'has_data': data is not None
+                        }
+                    )
+                    # Продолжаем работу после ошибки
+                    continue
                     
         except Exception as e:
-            self.send_log(f"Error in {self.__class__.__name__}: {str(e)}", level="error")
+            # Отправляем информацию о критической ошибке
+            self.send_exception(
+                e,
+                f"Critical error in {self.__class__.__name__}",
+                level="critical",
+                component_info={
+                    'state': 'failed'
+                }
+            )
             self.send_status('error', error=str(e))
         finally:
             self.send_status('stopped')
@@ -146,16 +224,49 @@ class SRCstage(PipelineElement):
         self.vu_meter_update_interval = 3  # Уменьшаем интервал обновления
         self.last_level_msg_time = 0  # Время последней отправки уровня
         self.min_level_update_interval = 0.05  # Уменьшаем минимальный интервал между обновлениями в секундах
+        self.stage_id = f"src_{id(self)}"  # Добавляем уникальный идентификатор стейджа
         self.send_log("SRC stage initialized", details={"buffer_size": self.fifo_buffer.max_size})
 
     def send_log(self, message: str, level: str = "info", **kwargs):
-        """Enhanced logging from components"""
+        """Enhanced logging with source identification"""
+        content = {
+            'message': message,
+            'level': level,
+            'details': {
+                'stage_id': self.stage_id,
+                'stage_type': 'src',
+                'component_info': kwargs.get('component_info', {}),
+                **kwargs
+            }
+        }
+        
         msg = PipelineMessage(
-            source=self.__class__.__name__.lower(),
+            source=f"src.{kwargs.get('component', 'main')}",  # Добавляем компонент в источник
             type=MessageType.LOG,
-            content={'message': message, 'level': level, **kwargs}
+            content=content
         )
         msg.send(self.out_queue)
+
+    def _send_message(self, msg_type: MessageType, content: dict):
+        """Enhanced message sending with component tracking"""
+        if not self.out_queue:
+            return False
+            
+        try:
+            component = content.get('source_details', {}).get('component', 'main')
+            source = f"src.{component}"
+            
+            msg = PipelineMessage(
+                source=source,
+                type=msg_type,
+                content=content
+            )
+            return msg.send(self.out_queue)
+        except Exception as e:
+            self.send_log(f"Error sending message: {e}", 
+                         level="error",
+                         component="message_handler")
+            return False
 
     def configure(self):
         """Initialize audio source based on configuration"""
@@ -211,42 +322,62 @@ class SRCstage(PipelineElement):
         try:
             # Проверка входных данных
             if audio_chunk is None or not isinstance(audio_chunk, np.ndarray):
+                self.send_log("Invalid audio data received", level="warning")
                 return None
 
             # Нормализация до float32 [-1, 1]
             if audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
-            if np.abs(audio_chunk).max() > 1.0:
+            if np.max(np.abs(audio_chunk)) > 1.0:  # Исправляем проблемную строку
                 audio_chunk = audio_chunk / 32768.0
 
             # Измерение уровня входного сигнала
             level = int(calculate_vu_meter(audio_chunk))
             
-            # Отправка уровня сигнала
+            # Отправка уровня сигнала с проверкой частоты обновления
             if self.vad_chunks_counter % self.vu_meter_update_interval == 0:
                 self.send_level_message(level)
 
             # Ресэмплинг до 16 кГц если нужно
             audio_chunk = self._resample_to_16k(audio_chunk)
 
-            # Добавление в буфер
-            self.fifo_buffer.add_data(audio_chunk)
+            # Добавление в буфер с проверкой размера
+            if len(audio_chunk) > 0:
+                self.fifo_buffer.add_data(audio_chunk)
+                self.send_log("Buffer updated", level="debug", 
+                            details={"buffer_size": len(self.fifo_buffer.buffer)})
             
             # Обработка данных из буфера
-            processed = False
             while chunk := self.fifo_buffer.get_chunk(self.vad.frame_size):
-                processed = True
-                if self.vad.detect_voice(chunk):
-                    self.audio_write(chunk)
+                try:
+                    if self.vad.detect_voice(chunk):
+                        self.audio_write(chunk)
+                except Exception as e:
+                    self.send_exception(
+                        e,
+                        "VAD processing error",
+                        component="vad",
+                        component_info={
+                            'frame_size': self.vad.frame_size,
+                            'chunk_size': len(chunk)
+                        }
+                    )
+                    break
 
-            if not processed:
-                self.send_level_message(0, is_silence=True)
-
+            self.vad_chunks_counter += 1
             return None
 
         except Exception as e:
-            self.send_log(f"Process error: {str(e)}", level="error")
-            raise
+            self.send_exception(
+                e,
+                "Process error",
+                component="processor",
+                component_info={
+                    'chunk_size': len(audio_chunk) if audio_chunk is not None else 0,
+                    'buffer_size': len(self.fifo_buffer.buffer) if hasattr(self, 'fifo_buffer') else 0
+                }
+            )
+            return None
 
     def _resample_to_16k(self, audio_chunk):
         """Ресэмплинг аудиоданных до 16 кГц и одного канала."""
@@ -299,8 +430,16 @@ class SRCstage(PipelineElement):
                 else:
                     time.sleep(0.01)
         except Exception as e:
-            self.send_log(f"SRC error: {str(e)}", level="error", 
-                         details={"exception_type": type(e).__name__})
+            self.send_exception(
+                e,
+                "SRC stage error",
+                level="error",
+                component="main",
+                component_info={
+                    'stage_id': self.stage_id,
+                    'stage_type': 'src'
+                }
+            )
             self.send_status('error', error=str(e))
         finally:
             self.send_log("SRC stage stopping", level="info")
@@ -350,7 +489,11 @@ class ASRstage(PipelineElement):
                 else:
                     time.sleep(0.01)
         except Exception as e:
-            self.send_log(f"ASR error: {str(e)}", level="error")
+            self.send_exception(
+                e,
+                "ASR stage error",
+                level="error"
+            )
             self.send_status('error', error=str(e))
         finally:
             if self.text_buffer:

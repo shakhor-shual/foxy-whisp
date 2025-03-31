@@ -190,7 +190,13 @@ class FoxyWhispServer:
             elif msg.is_control():
                 self._handle_control(msg)
         except Exception as e:
-            logger.error(f"Error handling message: {e}\nMessage: {msg}")
+            # Добавляем полный контекст ошибки
+            error_context = {
+                'message_type': msg.type,
+                'source': msg.source,
+                'content': msg.content
+            }
+            logger.exception(f"Error handling message: {e}", extra=error_context)
 
     ####################
     def _handle_log(self, msg: PipelineMessage):
@@ -437,7 +443,7 @@ class FoxyWhispServer:
                     
             return True
         except Exception as e:
-            logger.error(f"Error processing messages: {e}")
+            logger.exception(f"Error processing messages: {e}")
             return False
 
     ####################
