@@ -24,7 +24,8 @@ class FoxyWhispGUI:
                     if isinstance(level, (int, float)):
                         self.level_bar["value"] = level
         except Exception as e:
-            print(f"[GUI.ERROR] Failed to update audio level: {e}")
+            import traceback
+            print(f"[GUI.ERROR] Failed to update audio level: {e}\n{traceback.format_exc()}")
 
     def _update_vad_status(self, is_active: bool):
         """Direct VAD status update with widget check"""
