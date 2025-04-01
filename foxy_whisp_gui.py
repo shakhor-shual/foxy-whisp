@@ -11,6 +11,7 @@ import signal
 from foxy_whisp_server import FoxyWhispServer
 from logic.foxy_message import PipelineMessage
 from logic.log_filter import LogFilter
+from logic.message_formatter import MessageFormatter
 import queue
 import time
 
@@ -41,6 +42,7 @@ class FoxyWhispGUI:
             'is_configured': False
         }
         self._fade_update_after = None  # Add initialization
+        self.message_formatter = MessageFormatter()
 
         self.setup_gui()
         self.start_queue_listener()
@@ -604,34 +606,16 @@ class FoxyWhispGUI:
     def append_text(self, text: str):
         """Append text with improved message parsing"""
         try:
-            if text.startswith('[') and ']' in text:
-                parts = text[1:].split(']', 1)
-                if len(parts) == 2:
-                    source_parts = parts[0].lower().split('.')
-                    message = parts[1].strip()
+            # Используем форматтер для разбора сообщения
+            if parsed := self.message_formatter.format_message(text):
+                base_source, component, level, message = parsed
+                
+                # Проверяем фильтры
+                if not self.log_filter.matches(base_source, level, message):
+                    return
                     
-                    # Extract components
-                    base_source = source_parts[0]
-                    level = source_parts[-1] if len(source_parts) > 1 else 'info'
-                    component = '.'.join(source_parts[1:-1]) if len(source_parts) > 2 else 'main'
-                    
-                    # Apply source mapping
-                    source_mappings = {
-                        'srcstage': 'src',
-                        'asrstage': 'asr',
-                        'system': 'server',
-                        'audio_device': 'src',
-                        'tcp': 'src',
-                        'vad': 'src'
-                    }
-                    base_source = source_mappings.get(base_source, base_source)
-                    
-                    # Check filters (only base source)
-                    if not self.log_filter.matches(base_source, level, message):
-                        return
-                    
-                    # Format final message
-                    text = f"[{base_source}.{component}.{level}] {message}"
+                # Форматируем финальное сообщение
+                text = f"[{base_source}.{component}.{level}] {message}"
             
             self.text.config(state=tk.NORMAL)
             self.text.insert(tk.END, text + "\n")
@@ -714,41 +698,25 @@ class FoxyWhispGUI:
                     self.root.after_idle(lambda: self._update_vad_status(voice_detected))
                     return
 
-            source_parts = msg.source.split('.')
-            base_source = source_parts[0]
-            component = source_parts[1] if len(source_parts) > 1 else 'main'
-            
             if msg.is_log():
-                level = msg.content.get('level', 'info')
-                message = msg.content.get('message', '')
-                context = msg.content.get('context', {})
-                
-                # Форматируем базовое сообщение
-                formatted_message = f"[{base_source}.{component}.{level}] {message}"
-                
-                # Добавляем контекст выполнения
-                if exec_context := context.get('execution_context'):
-                    context_str = ', '.join(f"{k}={v}" for k, v in exec_context.items() 
-                                          if k not in ('component', 'stage'))
-                    if context_str:
-                        formatted_message += f" ({context_str})"
-                
-                # Для ошибок добавляем расширенную информацию
-                if level in ('error', 'critical'):
-                    if error_info := context.get('error_info'):
-                        formatted_message += "\nTraceback (most recent call last):"
-                        if traceback := error_info.get('traceback'):
-                            formatted_message += '\n' + '\n'.join(f"  {line}" for line in traceback)
-                        
-                        if locals_info := error_info.get('locals'):
-                            formatted_message += "\nLocal variables:"
-                            for k, v in locals_info.items():
-                                formatted_message += f"\n  {k} = {v}"
-                
-                self.append_text_safe(formatted_message)
+                # Используем форматтер для лог сообщений
+                formatted = self.message_formatter.format_log_message(
+                    source=msg.source,
+                    level=msg.content.get('level', 'info'),
+                    message=msg.content.get('message', ''),
+                    context=msg.content.get('context')
+                )
+                self.append_text_safe(formatted)
                 
             elif msg.is_status():
-                self.handle_status_message(msg)
+                # Используем форматтер для статусов
+                formatted = self.message_formatter.format_status_message(
+                    source=msg.source,
+                    status=msg.content.get('status', ''),
+                    details=msg.content.get('details', {})
+                )
+                self.append_text_safe(formatted)
+                
             elif msg.is_data():
                 self.handle_data_message(msg)
                 
@@ -757,11 +725,10 @@ class FoxyWhispGUI:
             error_context = {
                 'traceback': traceback.format_exc(),
                 'message_type': msg.type if msg else None,
-                'message_source': msg.source if msg else None,
-                'message_content': msg.content if msg else None
+                'message_source': msg.source if msg else None
             }
             self.append_text_safe(f"[ERROR] Message processing failed: {e}\n" + 
-                                  f"Context: {error_context}")
+                               f"Context: {error_context}")
 
     def handle_status_message(self, msg: PipelineMessage):
         try:
