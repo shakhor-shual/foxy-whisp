@@ -1,15 +1,8 @@
-from enum import Enum, auto
 from typing import Optional, Dict, Any, Union
 from multiprocessing import Queue
 import time
-from .message_validator import MessageValidator, MessageSource
-
-class MessageType(Enum):
-    LOG = auto()
-    STATUS = auto()
-    DATA = auto()
-    COMMAND = auto()
-    CONTROL = auto()
+from .messaging.types import MessageType, MessageSource
+from .messaging.validator import MessageValidator
 
 class PipelineMessage:
     def __init__(self, source: str, type: MessageType, content: Dict[str, Any]):
@@ -18,25 +11,8 @@ class PipelineMessage:
         self.content = content
         self.timestamp = time.time()
         
-        if not self._validate():
+        if not MessageValidator.validate_message(self):
             raise ValueError(f"Invalid message format for type {type}")
-
-    def _validate(self) -> bool:
-        """Validate message format"""
-        if not MessageValidator.validate_source(self.source):
-            return False
-            
-        if not isinstance(self.content, dict):
-            return False
-            
-        validators = {
-            MessageType.LOG: MessageValidator.validate_log_content,
-            MessageType.STATUS: MessageValidator.validate_status_content,
-            MessageType.DATA: MessageValidator.validate_data_content,
-            MessageType.COMMAND: MessageValidator.validate_command_content
-        }
-        
-        return validators.get(self.type, lambda x: True)(self.content)
 
     @classmethod
     def create_log(cls, source: str, message: str, level: str = "info", **kwargs) -> 'PipelineMessage':

@@ -1,6 +1,7 @@
 from multiprocessing import Queue as MPQueue
 from typing import Optional, Dict, Any, Callable, Tuple
-from .foxy_message import PipelineMessage, MessageType
+from .foxy_message import PipelineMessage
+from .messaging.types import MessageType, MessageSource
 import logging
 import queue
 
