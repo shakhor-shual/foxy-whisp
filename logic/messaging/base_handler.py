@@ -43,6 +43,65 @@ class BaseMessageHandler:
         return True
 
     @classmethod
+    def validate_status_content(cls, content: Dict[str, Any]) -> bool:
+        """Validate status message content"""
+        if not isinstance(content, dict):
+            return False
+            
+        if 'status' not in content or not isinstance(content['status'], str):
+            return False
+            
+        if 'details' in content and not isinstance(content['details'], dict):
+            return False
+            
+        return True
+
+    @classmethod
+    def validate_data_content(cls, content: Dict[str, Any]) -> bool:
+        """Validate data message content"""
+        if not isinstance(content, dict):
+            return False
+            
+        required_fields = {'data_type', 'payload'}
+        if not all(field in content for field in required_fields):
+            return False
+            
+        return True
+
+    @classmethod
+    def validate_command_content(cls, content: Dict[str, Any]) -> bool:
+        """Validate command message content"""
+        if not isinstance(content, dict):
+            return False
+            
+        if 'command' not in content or not isinstance(content['command'], str):
+            return False
+            
+        if 'params' in content and not isinstance(content['params'], dict):
+            return False
+            
+        return True
+
+    @classmethod
+    def validate_audio_level_data(cls, level_data: Dict[str, Any]) -> bool:
+        """Validate audio level data content"""
+        required_fields = {'level', 'timestamp'}
+        
+        if not all(field in level_data for field in required_fields):
+            return False
+            
+        if not isinstance(level_data['level'], (int, float)):
+            return False
+            
+        if not isinstance(level_data['timestamp'], (int, float)):
+            return False
+            
+        if level_data['level'] < 0 or level_data['level'] > 100:
+            return False
+            
+        return True
+
+    @classmethod
     def validate_message(cls, msg) -> bool:
         """Validate entire message structure"""
         if not isinstance(msg.content, dict):
