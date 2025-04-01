@@ -40,30 +40,43 @@ class PipelineMessage:
 
     @classmethod
     def create_log(cls, source: str, message: str, level: str = "info", **kwargs) -> 'PipelineMessage':
-        """Create a log message"""
+        """Create a log message with enhanced validation"""
         content = {
             'message': message,
             'level': level.lower(),
-            **kwargs
+            'timestamp': time.time(),
+            'source_details': {
+                'component': kwargs.pop('component', 'main'),
+                'context': kwargs
+            }
         }
         return cls(source, MessageType.LOG, content)
 
     @classmethod
     def create_status(cls, source: str, status: str, **details) -> 'PipelineMessage':
-        """Create a status message"""
+        """Create a status message with metadata"""
         content = {
             'status': status,
-            'details': details
+            'timestamp': time.time(),
+            'details': details,
+            'metadata': {
+                'source_type': source.split('.')[0],
+                'component': details.get('component', 'main')
+            }
         }
         return cls(source, MessageType.STATUS, content)
 
     @classmethod
     def create_data(cls, source: str, data_type: str, data: Any, **metadata) -> 'PipelineMessage':
-        """Create a data message"""
+        """Create a data message with validation"""
         content = {
             'data_type': data_type,
             'payload': data,
-            **metadata
+            'timestamp': time.time(),
+            'metadata': {
+                **metadata,
+                'source_type': source.split('.')[0]
+            }
         }
         return cls(source, MessageType.DATA, content)
 

@@ -1,6 +1,6 @@
-from .message import PipelineMessage, MessageType
+from ..foxy_message import PipelineMessage, MessageType
 from .validator import MessageValidator, MessageSource
-from .handler import MessageHandler
+from ..message_handler import MessageHandler
 from .formatter import MessageFormatter
 
 __all__ = [
