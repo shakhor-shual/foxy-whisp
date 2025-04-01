@@ -84,6 +84,10 @@ class FoxyWhispServer:
         self.test_thread = None
         self.test_running = False
 
+        self._shutdown_started = False
+        self._shutdown_completed = threading.Event()
+        self._cleanup_timeout = 5.0  # Timeout for cleanup in seconds
+
     ####################
     def _setup_log_redirection(self):
         """Перенаправление логов в GUI (только если queue.to_gui существует)"""
@@ -143,35 +147,19 @@ class FoxyWhispServer:
 
     ####################
     def _force_shutdown(self):
-        """Enhanced force shutdown with process cleanup"""
-        logger.critical("Force shutdown initiated...")
-        
-        try:
-            # Stop all stages first
-            self.stop_pipeline()
-            
-            # Force terminate processes that didn't stop
-            for name, proc in self.processes.items():
-                if proc and proc.is_alive():
+        """Force terminate all processes"""
+        for name, proc in self.processes.items():
+            if proc and proc.is_alive():
+                try:
                     logger.warning(f"Force terminating {name} process")
                     proc.terminate()
                     proc.join(timeout=1.0)
                     
-                    # Kill if still alive
                     if proc.is_alive():
-                        import signal
                         os.kill(proc.pid, signal.SIGKILL)
-                        logger.critical(f"Killed {name} process with SIGKILL")
-            
-            # Clear all queues
-            self.queues = PipelineQueues()
-            
-        except Exception as e:
-            logger.error(f"Error during force shutdown: {e}")
-            
-        finally:
-            self._shutdown_requested = True
-            self.stop_event.set()
+                        logger.critical(f"Had to SIGKILL {name} process")
+                except Exception as e:
+                    logger.error(f"Error terminating {name}: {e}")
 
     ####################
     def _init_processes(self):
@@ -259,9 +247,18 @@ class FoxyWhispServer:
 
     ####################
     def _handle_command(self, msg: PipelineMessage):
-        """Обработка команд от GUI"""
+        """Enhanced command handling"""
+        command = msg.content.get('command')
+        
+        if command == 'shutdown':
+            # Start shutdown in a separate thread to not block message processing
+            threading.Thread(
+                target=self.initiate_shutdown, 
+                daemon=True
+            ).start()
+            return
+            
         if msg.source == 'gui' and self.queues.from_gui is not None:
-            command = msg.content.get('command')
             params = msg.content.get('params', {})
             
             print(f"[SERVER] Received command: {command}")
@@ -617,7 +614,7 @@ class FoxyWhispServer:
 
     ####################
     def run(self):
-        """Основной цикл работы сервера"""
+        """Enhanced run method with shutdown handling"""
         self._send_gui_message(
             PipelineMessage.create_status(
                 source='server',
@@ -635,7 +632,7 @@ class FoxyWhispServer:
 
             self.start_pipeline()
 
-            while not self._shutdown_requested:
+            while not self._shutdown_completed.is_set():
                 if not self.process_messages():
                     logger.error("Message processing failed")
                     break
@@ -644,12 +641,8 @@ class FoxyWhispServer:
         except Exception as e:
             logger.critical(f"Server error: {e}", exc_info=True)
         finally:
-            if not self._shutdown_requested:
-                self.stop_pipeline()
-            
-            # Логируем перед очисткой
-            logger.info("Server stopping...")
-            self._cleanup()
+            if not self._shutdown_completed.is_set():
+                self.initiate_shutdown()
 
     ####################
     def _handle_signal(self, signum, frame):
@@ -718,6 +711,61 @@ class FoxyWhispServer:
             except Exception as e:
                 logger.error(f"Error sending test message: {e}")
                 break
+
+    ####################
+    def initiate_shutdown(self):
+        """Start the shutdown sequence"""
+        if self._shutdown_started:
+            return
+            
+        self._shutdown_started = True
+        logger.info("Server shutdown initiated")
+        
+        try:
+            # 1. Stop pipeline first
+            self.stop_pipeline()
+            
+            # 2. Wait for pipeline components to finish
+            shutdown_start = time.time()
+            while any(p and p.is_alive() for p in self.processes.values()):
+                if time.time() - shutdown_start > self._cleanup_timeout:
+                    logger.warning("Forcing process termination")
+                    self._force_shutdown()
+                    break
+                time.sleep(0.1)
+                
+            # 3. Clean up queues
+            self._cleanup_queues()
+            
+            # 4. Set shutdown completed event
+            self._shutdown_completed.set()
+            logger.info("Server shutdown completed")
+            
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+            self._force_shutdown()
+
+    ####################
+    def _cleanup_queues(self):
+        """Safe queue cleanup"""
+        for name, queue in vars(self.queues).items():
+            try:
+                if queue is None or queue._closed:
+                    continue
+                    
+                # Clear queue
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except:
+                        break
+                        
+                queue.close()
+                queue.join_thread()
+                logger.debug(f"Queue {name} closed")
+                
+            except Exception as e:
+                logger.warning(f"Error cleaning up queue {name}: {e}")
 
 ####################
 def main():

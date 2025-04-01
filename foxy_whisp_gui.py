@@ -588,38 +588,23 @@ class FoxyWhispGUI:
         self.advanced_options_visible = not self.advanced_options_visible
 
     def on_close(self):
-        """Enhanced window close handler with timeout"""
+        """Simplified close handler - just notify server and wait briefly"""
         try:
             if self.server_running:
-                # Signal server to stop
+                # Just send shutdown and wait briefly
                 self.send_command("shutdown")
                 
-                # Wait briefly for server to acknowledge
+                # Give server a moment to start shutdown
                 wait_start = time.time()
-                while self.server_running and time.time() - wait_start < 2.0:
+                while self.server_running and time.time() - wait_start < 1.0:
                     self.root.update()
                     time.sleep(0.1)
-                
-                # If still running, force close
-                if self.server_running:
-                    self.append_text("[WARNING] Server not responding, forcing shutdown")
             
-            # Schedule destroy after pending events
-            self.root.after(100, self._force_close)
+            self.root.destroy()
             
         except Exception as e:
-            print(f"Error during close: {e}")
+            print(f"GUI close error: {e}")
             self.root.destroy()
-
-    def _force_close(self):
-        """Force close the application"""
-        try:
-            self.root.destroy()
-        except:
-            pass
-        finally:
-            # Force exit if needed
-            os._exit(0)
 
     def append_text(self, text: str):
         """Append text with improved message parsing"""
