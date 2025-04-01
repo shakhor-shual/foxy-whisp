@@ -1,11 +1,9 @@
-from multiprocessing import Queue as MPQueue
-from typing import Optional, Dict, Any, Callable
-from .types import MessageType, MessageSource
-from ..foxy_message import PipelineMessage
+from typing import Optional, Dict, Any, Tuple
 import logging
+from .types import MessageType, MessageSource
 
 class BaseMessageHandler:
-    """Base class for message handling functionality"""
+    """Base handler with integrated validation"""
     
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -18,7 +16,52 @@ class BaseMessageHandler:
             'vad': 'src'
         }
 
-    def _format_message(self, text: str) -> Optional[tuple]:
+    @classmethod
+    def validate_source(cls, source: str) -> bool:
+        """Validate message source"""
+        try:
+            base_source = source.split('.')[0].lower()
+            normalized = MessageSource.normalize(base_source)
+            return normalized in [member.value for member in MessageSource]
+        except:
+            return False
+
+    @classmethod
+    def validate_log_content(cls, content: Dict[str, Any]) -> bool:
+        """Validate log message content"""
+        if not isinstance(content, dict):
+            return False
+            
+        required_fields = {'message', 'level'}
+        if not all(field in content for field in required_fields):
+            return False
+            
+        valid_levels = {'debug', 'info', 'warning', 'error', 'critical'}
+        if content['level'].lower() not in valid_levels:
+            return False
+            
+        return True
+
+    @classmethod
+    def validate_message(cls, msg) -> bool:
+        """Validate entire message structure"""
+        if not isinstance(msg.content, dict):
+            return False
+            
+        if not cls.validate_source(msg.source):
+            return False
+            
+        validators = {
+            MessageType.LOG: cls.validate_log_content,
+            MessageType.STATUS: cls.validate_status_content,
+            MessageType.DATA: cls.validate_data_content,
+            MessageType.COMMAND: cls.validate_command_content
+        }
+        
+        validator = validators.get(msg.type, lambda x: True)
+        return validator(msg.content)
+
+    def _format_message(self, text: str) -> Optional[Tuple[str, str, str, str]]:
         """Common message formatting logic"""
         try:
             if text.startswith('[') and ']' in text:
@@ -37,13 +80,3 @@ class BaseMessageHandler:
         except Exception as e:
             self.logger.error(f"Message parsing error: {e}, Text: {text}")
             return None
-
-    def _send_message(self, queue: MPQueue, message: PipelineMessage) -> bool:
-        """Common message sending logic"""
-        try:
-            if queue is None:
-                return False
-            return message.send(queue)
-        except Exception as e:
-            self.logger.error(f"Error sending message: {e}")
-            return False

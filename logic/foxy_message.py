@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, Union
 from multiprocessing import Queue
 import time
 from .messaging.types import MessageType, MessageSource
-from .messaging.validator import MessageValidator
+from .messaging.base_handler import BaseMessageHandler
 
 class PipelineMessage:
     def __init__(self, source: str, type: MessageType, content: Dict[str, Any]):
@@ -11,7 +11,7 @@ class PipelineMessage:
         self.content = content
         self.timestamp = time.time()
         
-        if not MessageValidator.validate_message(self):
+        if not BaseMessageHandler.validate_message(self):
             raise ValueError(f"Invalid message format for type {type}")
 
     @classmethod

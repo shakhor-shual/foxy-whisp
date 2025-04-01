@@ -64,8 +64,8 @@ class MessageHandler(BaseMessageHandler):
             self._notify('vad', voice_detected)
 
     def _handle_log(self, msg: PipelineMessage):
-        """Handle log messages"""
-        formatted = self.format_message(
+        """Handle log messages using base formatter"""
+        formatted = self._format_message(
             f"[{msg.source}.{msg.content.get('level', 'info')}] {msg.content.get('message', '')}"
         )
         if formatted:
@@ -73,8 +73,8 @@ class MessageHandler(BaseMessageHandler):
             self._notify('log', f"[{base_source}.{component}.{level}] {message}")
 
     def _handle_status(self, msg: PipelineMessage):
-        """Handle status messages"""
-        formatted = self.format_message(
+        """Handle status messages using base formatter"""
+        formatted = self._format_message(
             f"[{msg.source}.{msg.content.get('status', '')}] {msg.content.get('details', {})}"
         )
         if formatted:

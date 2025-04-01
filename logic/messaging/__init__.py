@@ -1,8 +1,8 @@
 from .types import MessageType, MessageSource
-from .validator import MessageValidator
+from .base_handler import BaseMessageHandler
 
 __all__ = [
     'MessageType',
     'MessageSource',
-    'MessageValidator'
+    'BaseMessageHandler'
 ]
