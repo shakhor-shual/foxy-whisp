@@ -1,25 +1,18 @@
 from multiprocessing import Queue as MPQueue
 from typing import Optional, Dict, Any, Callable, Tuple
+from .messaging.base_handler import BaseMessageHandler
 from .foxy_message import PipelineMessage
 from .messaging.types import MessageType, MessageSource
 import logging
 import queue
 
-class MessageHandler:
+class MessageHandler(BaseMessageHandler):
     """Центральный обработчик сообщений и форматирования"""
     
     def __init__(self, gui_to_server: MPQueue, server_to_gui: MPQueue):
+        super().__init__()
         self.gui_to_server = gui_to_server
         self.server_to_gui = server_to_gui
-        self.logger = logging.getLogger('gui.messages')
-        self.source_mappings = {
-            'srcstage': 'src',
-            'asrstage': 'asr',
-            'system': 'server',
-            'audio_device': 'src',
-            'tcp': 'src',
-            'vad': 'src'
-        }
         self.callbacks = {
             'log': [],
             'status': [],
@@ -39,28 +32,14 @@ class MessageHandler:
     def send_command(self, command: str, params: dict = None) -> bool:
         """Send command to server with logging"""
         try:
-            if self.gui_to_server is None:
-                self.logger.error("Server connection lost")
-                return False
-                
             msg = PipelineMessage.create_command(
                 source='gui',
                 command=command,
                 **(params or {})
             )
-            
-            success = msg.send(self.gui_to_server)
-            if success:
-                self.logger.info(f"Command sent: {command} with params: {params}")
-            else:
-                self.logger.error(f"Failed to send command: {command}")
-            return success
-            
-        except EOFError:
-            self.logger.error("Server connection closed")
-            return False
+            return self._send_message(self.gui_to_server, msg)
         except Exception as e:
-            self.logger.error(f"Error sending command: {str(e)}")
+            self.logger.error(f"Error sending command: {e}")
             return False
 
     def handle_message(self, msg: PipelineMessage):
@@ -101,7 +80,6 @@ class MessageHandler:
         if formatted:
             base_source, component, level, message = formatted
             self._notify('status', f"[{base_source}.{component}.{level}] {message}")
-        # Also notify button updates if needed
         self._process_status_updates(msg)
 
     def _handle_data(self, msg: PipelineMessage):
@@ -123,7 +101,7 @@ class MessageHandler:
                 callback(data)
             except Exception as e:
                 self.logger.error(f"Callback error for {msg_type}: {e}")
-
+                
     def _process_status_updates(self, msg: PipelineMessage):
         """Process status updates that affect UI state"""
         status = msg.content.get('status')
@@ -132,12 +110,10 @@ class MessageHandler:
                 config = {'text': "Стоп", 'state': 'normal'}
             else:
                 config = {'text': "Старт", 'state': 'normal'}
-                
-            # Отправляем кнопку и конфигурацию как отдельные элементы
             self._notify('button', {'type': 'server_state', 
                                   'button': 'server_btn',
                                   'config': config})
-
+                    
     def format_message(self, text: str) -> Optional[Tuple[str, str, str, str]]:
         """Перенесено из MessageFormatter"""
         try:
@@ -146,13 +122,10 @@ class MessageHandler:
                 if len(parts) == 2:
                     source_parts = parts[0].lower().split('.')
                     message = parts[1].strip()
-                    
                     base_source = source_parts[0]
                     level = source_parts[-1] if len(source_parts) > 1 else 'info'
                     component = '.'.join(source_parts[1:-1]) if len(source_parts) > 2 else 'main'
-                    
                     base_source = self.source_mappings.get(base_source, base_source)
-                    
                     return base_source, component, level, message
             return None
         except Exception as e:
